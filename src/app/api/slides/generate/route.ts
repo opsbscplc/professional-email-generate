@@ -5,11 +5,32 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 const OPENROUTER_API_KEY = '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'
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
-// OpenRouter KIMI K2 API helper function
-async function callKimiK2(prompt: string, timeout: number = 45000): Promise<string> {
+// OpenRouter KIMI K2 API helper function with comprehensive error handling
+async function callKimiK2(prompt: string, timeout: number = 60000): Promise<string> {
+  console.log('🚀 Attempting KIMI K2 API call...')
+  
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('KIMI K2 request timeout')), timeout)
   })
+
+  // Comprehensive request with all required headers and parameters
+  const requestBody = {
+    model: 'moonshot-v1-8k', // Updated to correct model name
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    temperature: 0.7,
+    max_tokens: 4000,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    stream: false
+  }
+
+  console.log('📤 KIMI K2 Request body:', JSON.stringify(requestBody, null, 2))
 
   const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -17,36 +38,104 @@ async function callKimiK2(prompt: string, timeout: number = 45000): Promise<stri
       'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://professional-email-generate.vercel.app',
-      'X-Title': 'Email Template Generator'
+      'X-Title': 'Email Template Generator',
+      'User-Agent': 'EmailAI/1.0'
     },
-    body: JSON.stringify({
-      model: 'moonshotai/kimi-k2:free',
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000
-    })
+    body: JSON.stringify(requestBody)
   })
 
   const response = await Promise.race([apiPromise, timeoutPromise]) as Response
   
+  console.log('📥 KIMI K2 Response status:', response.status, response.statusText)
+  
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('KIMI K2 API error details:', errorText)
-    throw new Error(`KIMI K2 API error: ${response.status} ${response.statusText}`)
+    console.error('❌ KIMI K2 API error details:', errorText)
+    
+    // Try alternative model names if the first one fails
+    if (response.status === 404 || errorText.includes('not found')) {
+      console.log('🔄 Trying alternative KIMI model name...')
+      return await callKimiK2Alternative(prompt, timeout)
+    }
+    
+    throw new Error(`KIMI K2 API error: ${response.status} ${response.statusText} - ${errorText}`)
   }
 
   const data = await response.json()
+  console.log('📊 KIMI K2 Response data structure:', JSON.stringify(data, null, 2))
   
   if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    throw new Error('Invalid response from KIMI K2 API')
+    console.error('❌ Invalid KIMI K2 response structure:', data)
+    throw new Error('Invalid response from KIMI K2 API - missing choices or message')
   }
 
-  return data.choices[0].message.content
+  const content = data.choices[0].message.content
+  console.log('✅ KIMI K2 successful response length:', content?.length || 0)
+  
+  return content
+}
+
+// Alternative KIMI K2 function with different model names
+async function callKimiK2Alternative(prompt: string, timeout: number = 60000): Promise<string> {
+  console.log('🔄 Trying alternative KIMI K2 models...')
+  
+  const alternativeModels = [
+    'moonshot-v1-8k',
+    'moonshot-v1-32k', 
+    'moonshot-v1-128k',
+    'moonshotai/moonshot-v1-8k'
+  ]
+
+  for (const modelName of alternativeModels) {
+    try {
+      console.log(`🧪 Testing model: ${modelName}`)
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Alternative KIMI request timeout')), timeout)
+      })
+
+      const requestBody = {
+        model: modelName,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      }
+
+      const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://professional-email-generate.vercel.app',
+          'X-Title': 'Email Template Generator'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      const response = await Promise.race([apiPromise, timeoutPromise]) as Response
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+          console.log(`✅ Success with model: ${modelName}`)
+          return data.choices[0].message.content
+        }
+      } else {
+        const errorText = await response.text()
+        console.log(`❌ Model ${modelName} failed:`, response.status, errorText)
+      }
+    } catch (error) {
+      console.log(`❌ Model ${modelName} error:`, error)
+      continue
+    }
+  }
+  
+  throw new Error('All KIMI K2 alternative models failed')
 }
 
 export async function POST(request: NextRequest) {
