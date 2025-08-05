@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey)
     
     // Try multiple models for better reliability
-    const modelNames = ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
     let model
     let modelError
     
