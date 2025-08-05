@@ -46,3 +46,38 @@ export interface TrainerState {
   isLoading: boolean
   error: string | null
 }
+
+// Slide Generation Types
+export enum SlideTheme {
+  MODERN = 'modern',
+  CORPORATE = 'corporate',
+  CREATIVE = 'creative',
+  MINIMAL = 'minimal',
+  DARK = 'dark'
+}
+
+export interface Slide {
+  id: string
+  title: string
+  content: string[]
+  speakerNotes: string
+  slideNumber: number
+}
+
+export interface SlidePresentation {
+  id: string
+  topic: string
+  theme: SlideTheme
+  slides: Slide[]
+  createdAt: Date
+}
+
+export interface SlideGeneratorState {
+  topic: string
+  selectedTheme: SlideTheme
+  presentation: SlidePresentation | null
+  isGenerating: boolean
+  currentSlideIndex: number
+  error: string | null
+  generationProgress: number
+}

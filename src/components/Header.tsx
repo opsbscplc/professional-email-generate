@@ -58,6 +58,17 @@ export function Header() {
             >
               AI Trainer
             </Link>
+            <Link 
+              href="/generate-slides" 
+              className={`text-sm transition-colors px-3 py-2 rounded-lg ${
+                isActive('/generate-slides') 
+                  ? 'bg-white/10' 
+                  : 'hover:bg-white/5'
+              }`}
+              style={{ color: isActive('/generate-slides') ? '#1877F2' : '#42A5F5' }}
+            >
+              Generate Slides
+            </Link>
           </nav>
 
           {/* Right side - API Key Status and Mobile Menu */}
@@ -107,6 +118,18 @@ export function Header() {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 🤖 AI Trainer
+              </Link>
+              <Link 
+                href="/generate-slides" 
+                className={`text-sm transition-colors px-3 py-2 rounded-lg ${
+                  isActive('/generate-slides') 
+                    ? 'bg-white/10' 
+                    : 'hover:bg-white/5'
+                }`}
+                style={{ color: isActive('/generate-slides') ? '#1877F2' : '#42A5F5' }}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                🎨 Generate Slides
               </Link>
             </div>
           </nav>
