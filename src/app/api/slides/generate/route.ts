@@ -1,34 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// OpenRouter fallback configuration
-const OPENROUTER_API_KEY = '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'
+// OpenRouter KIMI K2 Free API configuration
+const OPENROUTER_API_KEY = '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'
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
-// OpenRouter API helper function
-async function callOpenRouter(prompt: string, timeout: number = 45000): Promise<string> {
+// OpenRouter KIMI K2 API helper function
+async function callKimiK2(prompt: string, timeout: number = 45000): Promise<string> {
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('OpenRouter request timeout')), timeout)
+    setTimeout(() => reject(new Error('KIMI K2 request timeout')), timeout)
   })
 
   const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://professional-email-generate.vercel.app',
-      'X-Title': 'Email Template Generator'
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'deepseek/deepseek-chat',
+      model: 'moonshotai/kimi-k2:free',
       messages: [
         {
           role: 'user',
           content: prompt
         }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000
+      ]
     })
   })
 
@@ -36,14 +32,14 @@ async function callOpenRouter(prompt: string, timeout: number = 45000): Promise<
   
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('OpenRouter API error details:', errorText)
-    throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
+    console.error('KIMI K2 API error details:', errorText)
+    throw new Error(`KIMI K2 API error: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json()
   
   if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    throw new Error('Invalid response from OpenRouter API')
+    throw new Error('Invalid response from KIMI K2 API')
   }
 
   return data.choices[0].message.content
@@ -107,14 +103,14 @@ export async function POST(request: NextRequest) {
       slideText = slideResponse.text()
       console.log('Gemini slide generation successful')
     } catch (geminiError) {
-      console.log('Gemini failed, falling back to OpenRouter...', geminiError)
+      console.log('Gemini failed, falling back to KIMI K2...', geminiError)
       usingFallback = true
       
       try {
-        slideText = await callOpenRouter(slidePrompt, 45000)
-        console.log('OpenRouter slide generation successful')
-      } catch (openrouterError) {
-        console.error('Both Gemini and OpenRouter failed:', { geminiError, openrouterError })
+        slideText = await callKimiK2(slidePrompt, 45000)
+        console.log('KIMI K2 slide generation successful')
+      } catch (kimiError) {
+        console.error('Both Gemini and KIMI K2 failed:', { geminiError, kimiError })
         throw new Error('All AI services are currently unavailable. Please try again later.')
       }
     }
@@ -176,7 +172,14 @@ Return only the speaker notes text, nothing else.`
             console.log(`Gemini speaker notes attempt ${retryCount} failed for slide ${index + 1}:`, geminiError)
             
             if (retryCount > maxRetries) {
-              speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}.`
+              // Try KIMI K2 as final fallback for speaker notes
+              try {
+                console.log(`Trying KIMI K2 for speaker notes on slide ${index + 1}...`)
+                speakerNotes = await callKimiK2(notesPrompt, 15000)
+              } catch (kimiError) {
+                console.log(`KIMI K2 also failed for speaker notes on slide ${index + 1}:`, kimiError)
+                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}.`
+              }
             } else {
               // Wait before retry
               await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
