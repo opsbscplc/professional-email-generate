@@ -68,86 +68,11 @@ async function callClaude(prompt: string, timeout: number = 60000): Promise<stri
   return content
 }
 
-// OpenRouter API helper function with working free models
+// Disabled OpenRouter fallback (API key is invalid)
+// This function is kept for compatibility but immediately throws an error
 async function callKimiK2(prompt: string, timeout: number = 60000): Promise<string> {
-  console.log('🚀 Attempting OpenRouter API call...')
-  
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('OpenRouter request timeout')), timeout)
-  })
-
-  // Use working free models from OpenRouter
-  const modelConfigs = [
-    { model: 'meta-llama/llama-3.1-8b-instruct:free', name: 'Llama 3.1 8B Free' },
-    { model: 'microsoft/phi-3-mini-128k-instruct:free', name: 'Phi-3 Mini Free' },
-    { model: 'google/gemma-2-9b-it:free', name: 'Gemma 2 9B Free' },
-    { model: 'qwen/qwen-2-7b-instruct:free', name: 'Qwen 2 7B Free' }
-  ]
-
-  for (const config of modelConfigs) {
-    try {
-      console.log(`🧪 Trying ${config.name}...`)
-      
-      const requestBody = {
-        model: config.model,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-        stream: false
-      }
-
-      const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://professional-email-generate.vercel.app',
-          'X-Title': 'Email Template Generator'
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      const response = await Promise.race([apiPromise, timeoutPromise]) as Response
-      
-      console.log(`📥 ${config.name} Response:`, response.status, response.statusText)
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log(`📊 ${config.name} Response structure:`, JSON.stringify(data, null, 2))
-        
-        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-          const content = data.choices[0].message.content
-          console.log(`✅ ${config.name} successful! Length:`, content?.length || 0)
-          return content
-        } else {
-          console.log(`❌ ${config.name} invalid response structure:`, data)
-        }
-      } else {
-        const errorText = await response.text()
-        console.log(`❌ ${config.name} failed:`, response.status, errorText)
-        
-        // If we get 401, the API key is definitely invalid, so stop trying
-        if (response.status === 401) {
-          throw new Error('OpenRouter API key is invalid or expired')
-        }
-      }
-    } catch (error) {
-      console.log(`❌ ${config.name} error:`, error)
-      
-      // If it's an auth error, don't continue trying other models
-      if (error instanceof Error && error.message.includes('invalid or expired')) {
-        throw error
-      }
-      continue
-    }
-  }
-  
-  throw new Error('All OpenRouter models failed - API key may be invalid')
+  console.log('⚠️ OpenRouter API is disabled (invalid API key)')
+  throw new Error('OpenRouter API key is invalid - skipping to emergency fallback')
 }
 
 // Emergency fallback - generates basic slides when all AI services fail
@@ -412,31 +337,22 @@ export async function POST(request: NextRequest) {
         } catch (claudeError) {
           console.log('❌ Claude failed, trying OpenRouter...', claudeError)
           
-          // Try OpenRouter if Claude fails
-          try {
-            slideText = await callKimiK2(slidePrompt, 45000)
-            console.log('✅ OpenRouter slide generation successful')
-          } catch (openrouterError) {
-            console.error('All AI services failed:', { geminiError, claudeError, openrouterError })
-            console.log('🚨 Using emergency fallback')
-            
-            const emergencySlides = generateEmergencySlides(topic)
-            slideText = JSON.stringify(emergencySlides)
-          }
-        }
-      } else {
-        // Try OpenRouter if Claude is not configured
-        try {
-          console.log('🔄 Trying OpenRouter as fallback...')
-          slideText = await callKimiK2(slidePrompt, 45000)
-          console.log('✅ OpenRouter slide generation successful')
-        } catch (openrouterError) {
-          console.error('Both Gemini and OpenRouter failed:', { geminiError, openrouterError })
+          // OpenRouter is disabled due to invalid API key, skip to emergency fallback
+          console.log('⚠️ OpenRouter disabled, using emergency fallback')
+          console.error('Gemini and Claude failed:', { geminiError, claudeError })
           console.log('🚨 Using emergency fallback')
           
           const emergencySlides = generateEmergencySlides(topic)
           slideText = JSON.stringify(emergencySlides)
         }
+      } else {
+        // OpenRouter is disabled due to invalid API key, use emergency fallback
+        console.log('⚠️ Claude not configured and OpenRouter disabled')
+        console.error('Only Gemini failed:', { geminiError })
+        console.log('🚨 Using emergency fallback')
+        
+        const emergencySlides = generateEmergencySlides(topic)
+        slideText = JSON.stringify(emergencySlides)
       }
     }
 
@@ -503,21 +419,13 @@ Return only the speaker notes text, nothing else.`
                   console.log(`Trying Claude for speaker notes on slide ${index + 1}...`)
                   speakerNotes = await callClaude(notesPrompt, 15000)
                 } catch (claudeError) {
-                  console.log(`Claude failed for speaker notes on slide ${index + 1}, trying OpenRouter...`)
-                  try {
-                    speakerNotes = await callKimiK2(notesPrompt, 15000)
-                  } catch (openrouterError) {
-                    speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
-                  }
-                }
-              } else {
-                try {
-                  console.log(`Trying OpenRouter for speaker notes on slide ${index + 1}...`)
-                  speakerNotes = await callKimiK2(notesPrompt, 15000)
-                } catch (openrouterError) {
-                  console.log(`OpenRouter also failed for speaker notes on slide ${index + 1}:`, openrouterError)
+                  console.log(`Claude failed for speaker notes on slide ${index + 1}, OpenRouter disabled, using fallback`)
                   speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
                 }
+              } else {
+                // OpenRouter is disabled, use fallback speaker notes
+                console.log(`OpenRouter disabled for speaker notes on slide ${index + 1}, using fallback`)
+                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
               }
             } else {
               // Wait before retry
