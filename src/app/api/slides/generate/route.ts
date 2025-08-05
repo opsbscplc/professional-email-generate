@@ -108,6 +108,196 @@ async function callKimiK2(prompt: string, timeout: number = 60000): Promise<stri
   throw new Error('All OpenRouter models failed')
 }
 
+// Emergency fallback - generates basic slides when all AI services fail
+function generateEmergencySlides(topic: string): any[] {
+  console.log('🚨 Using emergency fallback slide generation')
+  
+  const slides = [
+    {
+      title: `Introduction to ${topic}`,
+      content: [
+        `Welcome to this presentation on ${topic}`,
+        "We'll explore the key concepts and latest developments",
+        "This session will provide valuable insights",
+        "Let's begin our journey into this fascinating subject"
+      ]
+    },
+    {
+      title: "Overview and Background",
+      content: [
+        `${topic} has evolved significantly over recent years`,
+        "Understanding the fundamentals is crucial",
+        "Historical context provides important perspective",
+        "Current trends shape future developments"
+      ]
+    },
+    {
+      title: "Key Components and Elements",
+      content: [
+        "Several critical components define this field",
+        "Each element plays a vital role",
+        "Integration between components is essential",
+        "Understanding relationships improves comprehension"
+      ]
+    },
+    {
+      title: "Current Technologies and Methods",
+      content: [
+        "Modern approaches have revolutionized the field",
+        "Technology continues to drive innovation",
+        "Best practices have emerged from experience",
+        "Efficiency and effectiveness are key priorities"
+      ]
+    },
+    {
+      title: "Latest Developments and Innovations",
+      content: [
+        "Recent breakthroughs have opened new possibilities",
+        "Innovation drives continuous improvement",
+        "Emerging technologies show great promise",
+        "Research continues to push boundaries"
+      ]
+    },
+    {
+      title: "Benefits and Advantages",
+      content: [
+        "Significant benefits have been demonstrated",
+        "Advantages over traditional methods are clear",
+        "Cost-effectiveness is an important factor",
+        "Performance improvements are measurable"
+      ]
+    },
+    {
+      title: "Challenges and Considerations",
+      content: [
+        "Several challenges must be addressed",
+        "Technical limitations require careful consideration",
+        "Implementation can be complex",
+        "Solutions are being actively developed"
+      ]
+    },
+    {
+      title: "Implementation Strategies",
+      content: [
+        "Successful implementation requires careful planning",
+        "Step-by-step approaches work best",
+        "Risk management is essential",
+        "Stakeholder engagement improves outcomes"
+      ]
+    },
+    {
+      title: "Best Practices and Guidelines",
+      content: [
+        "Industry best practices have been established",
+        "Following guidelines ensures success",
+        "Experience has taught valuable lessons",
+        "Continuous improvement is recommended"
+      ]
+    },
+    {
+      title: "Case Studies and Examples",
+      content: [
+        "Real-world examples demonstrate effectiveness",
+        "Case studies provide practical insights",
+        "Success stories inspire confidence",
+        "Lessons learned guide future projects"
+      ]
+    },
+    {
+      title: "Technical Specifications",
+      content: [
+        "Technical requirements must be clearly defined",
+        "Specifications ensure compatibility",
+        "Standards promote interoperability",
+        "Documentation is crucial for success"
+      ]
+    },
+    {
+      title: "Performance and Efficiency",
+      content: [
+        "Performance metrics guide optimization",
+        "Efficiency improvements reduce costs",
+        "Monitoring ensures consistent quality",
+        "Benchmarking enables comparison"
+      ]
+    },
+    {
+      title: "Security and Reliability",
+      content: [
+        "Security considerations are paramount",
+        "Reliability ensures consistent operation",
+        "Risk mitigation strategies are essential",
+        "Backup systems provide redundancy"
+      ]
+    },
+    {
+      title: "Future Trends and Predictions",
+      content: [
+        "Future developments look promising",
+        "Trends indicate continued growth",
+        "Predictions suggest exciting possibilities",
+        "Innovation will drive future success"
+      ]
+    },
+    {
+      title: "Industry Impact and Applications",
+      content: [
+        "Industry impact has been significant",
+        "Applications continue to expand",
+        "Market adoption is accelerating",
+        "Economic benefits are substantial"
+      ]
+    },
+    {
+      title: "Research and Development",
+      content: [
+        "Ongoing research drives advancement",
+        "Development efforts focus on improvement",
+        "Collaboration enhances progress",
+        "Investment in R&D is increasing"
+      ]
+    },
+    {
+      title: "Global Perspectives and Adoption",
+      content: [
+        "Global adoption varies by region",
+        "International cooperation is beneficial",
+        "Cultural factors influence implementation",
+        "Standardization efforts are ongoing"
+      ]
+    },
+    {
+      title: "Economic and Business Implications",
+      content: [
+        "Economic impact is substantial",
+        "Business models are evolving",
+        "Investment opportunities are emerging",
+        "Market dynamics continue to change"
+      ]
+    },
+    {
+      title: "Recommendations and Next Steps",
+      content: [
+        "Key recommendations have been identified",
+        "Next steps should be prioritized",
+        "Action plans need to be developed",
+        "Implementation should begin promptly"
+      ]
+    },
+    {
+      title: "Conclusion and Summary",
+      content: [
+        `${topic} represents an important and evolving field`,
+        "Key points have been covered comprehensively",
+        "Future prospects look very promising",
+        "Thank you for your attention and engagement"
+      ]
+    }
+  ]
+  
+  return slides
+}
+
 
 
 export async function POST(request: NextRequest) {
@@ -175,8 +365,13 @@ export async function POST(request: NextRequest) {
         slideText = await callKimiK2(slidePrompt, 45000)
         console.log('KIMI K2 slide generation successful')
       } catch (kimiError) {
-        console.error('Both Gemini and KIMI K2 failed:', { geminiError, kimiError })
-        throw new Error('All AI services are currently unavailable. Please try again later.')
+        console.error('Both Gemini and OpenRouter failed:', { geminiError, kimiError })
+        console.log('🚨 All AI services failed, using emergency fallback')
+        
+        // Use emergency fallback when all AI services fail
+        const emergencySlides = generateEmergencySlides(topic)
+        slideText = JSON.stringify(emergencySlides)
+        usingFallback = true
       }
     }
 
@@ -242,8 +437,8 @@ Return only the speaker notes text, nothing else.`
                 console.log(`Trying KIMI K2 for speaker notes on slide ${index + 1}...`)
                 speakerNotes = await callKimiK2(notesPrompt, 15000)
               } catch (kimiError) {
-                console.log(`KIMI K2 also failed for speaker notes on slide ${index + 1}:`, kimiError)
-                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}.`
+                console.log(`OpenRouter also failed for speaker notes on slide ${index + 1}:`, kimiError)
+                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
               }
             } else {
               // Wait before retry
