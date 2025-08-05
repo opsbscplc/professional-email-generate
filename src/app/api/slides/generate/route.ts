@@ -22,30 +22,8 @@ export async function POST(request: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     
-    // Try multiple models for better reliability
-    const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
-    let model
-    let modelError
-    
-    for (const modelName of modelNames) {
-      try {
-        model = genAI.getGenerativeModel({ model: modelName })
-        // Test the model with a simple request
-        const testResult = await model.generateContent('test')
-        await testResult.response.text()
-        console.log(`Using model: ${modelName}`)
-        break
-      } catch (error) {
-        console.log(`Model ${modelName} failed, trying next...`)
-        modelError = error
-        continue
-      }
-    }
-    
-    if (!model) {
-      const errorMsg = modelError instanceof Error ? modelError.message : 'Unknown error'
-      throw new Error(`All Gemini models are currently unavailable: ${errorMsg}`)
-    }
+    // Use the most reliable current model
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
     // Generate slide content
     const slidePrompt = `Create a comprehensive presentation about "${topic}" with exactly 20 slides. 
