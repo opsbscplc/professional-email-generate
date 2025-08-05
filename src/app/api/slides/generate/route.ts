@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// OpenRouter KIMI K2 Free API configuration
+// Fallback API configurations
 const OPENROUTER_API_KEY = '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'
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+
+// Claude API configuration (you'll need to get your own API key from https://console.anthropic.com/)
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '' // Add your Claude API key to environment variables
+const CLAUDE_BASE_URL = 'https://api.anthropic.com/v1'
 
 // Test OpenRouter API key validity
 async function testOpenRouterKey(): Promise<boolean> {
@@ -29,6 +33,63 @@ async function testOpenRouterKey(): Promise<boolean> {
     console.error('🔑 OpenRouter key test failed:', error)
     return false
   }
+}
+
+// Claude API helper function
+async function callClaude(prompt: string, timeout: number = 60000): Promise<string> {
+  if (!CLAUDE_API_KEY) {
+    throw new Error('Claude API key not configured')
+  }
+
+  console.log('🤖 Attempting Claude API call...')
+  
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Claude request timeout')), timeout)
+  })
+
+  const requestBody = {
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 4000,
+    temperature: 0.7,
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ]
+  }
+
+  const apiPromise = fetch(`${CLAUDE_BASE_URL}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLAUDE_API_KEY}`,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(requestBody)
+  })
+
+  const response = await Promise.race([apiPromise, timeoutPromise]) as Response
+  
+  console.log('📥 Claude Response status:', response.status, response.statusText)
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('❌ Claude API error details:', errorText)
+    throw new Error(`Claude API error: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    console.error('❌ Invalid Claude response structure:', data)
+    throw new Error('Invalid response from Claude API')
+  }
+
+  const content = data.content[0].text
+  console.log('✅ Claude successful response length:', content?.length || 0)
+  
+  return content
 }
 
 // OpenRouter KIMI K2 API helper function with comprehensive error handling
@@ -358,20 +419,43 @@ export async function POST(request: NextRequest) {
       slideText = slideResponse.text()
       console.log('Gemini slide generation successful')
     } catch (geminiError) {
-      console.log('Gemini failed, falling back to KIMI K2...', geminiError)
+      console.log('Gemini failed, trying fallback services...', geminiError)
       usingFallback = true
       
-      try {
-        slideText = await callKimiK2(slidePrompt, 45000)
-        console.log('KIMI K2 slide generation successful')
-      } catch (kimiError) {
-        console.error('Both Gemini and OpenRouter failed:', { geminiError, kimiError })
-        console.log('🚨 All AI services failed, using emergency fallback')
-        
-        // Use emergency fallback when all AI services fail
-        const emergencySlides = generateEmergencySlides(topic)
-        slideText = JSON.stringify(emergencySlides)
-        usingFallback = true
+      // Try Claude first (if API key is configured)
+      if (CLAUDE_API_KEY) {
+        try {
+          console.log('🤖 Trying Claude as fallback...')
+          slideText = await callClaude(slidePrompt, 45000)
+          console.log('✅ Claude slide generation successful')
+        } catch (claudeError) {
+          console.log('❌ Claude failed, trying OpenRouter...', claudeError)
+          
+          // Try OpenRouter if Claude fails
+          try {
+            slideText = await callKimiK2(slidePrompt, 45000)
+            console.log('✅ OpenRouter slide generation successful')
+          } catch (openrouterError) {
+            console.error('All AI services failed:', { geminiError, claudeError, openrouterError })
+            console.log('🚨 Using emergency fallback')
+            
+            const emergencySlides = generateEmergencySlides(topic)
+            slideText = JSON.stringify(emergencySlides)
+          }
+        }
+      } else {
+        // Try OpenRouter if Claude is not configured
+        try {
+          console.log('🔄 Trying OpenRouter as fallback...')
+          slideText = await callKimiK2(slidePrompt, 45000)
+          console.log('✅ OpenRouter slide generation successful')
+        } catch (openrouterError) {
+          console.error('Both Gemini and OpenRouter failed:', { geminiError, openrouterError })
+          console.log('🚨 Using emergency fallback')
+          
+          const emergencySlides = generateEmergencySlides(topic)
+          slideText = JSON.stringify(emergencySlides)
+        }
       }
     }
 
@@ -432,13 +516,27 @@ Return only the speaker notes text, nothing else.`
             console.log(`Gemini speaker notes attempt ${retryCount} failed for slide ${index + 1}:`, geminiError)
             
             if (retryCount > maxRetries) {
-              // Try KIMI K2 as final fallback for speaker notes
-              try {
-                console.log(`Trying KIMI K2 for speaker notes on slide ${index + 1}...`)
-                speakerNotes = await callKimiK2(notesPrompt, 15000)
-              } catch (kimiError) {
-                console.log(`OpenRouter also failed for speaker notes on slide ${index + 1}:`, kimiError)
-                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+              // Try fallback services for speaker notes
+              if (CLAUDE_API_KEY) {
+                try {
+                  console.log(`Trying Claude for speaker notes on slide ${index + 1}...`)
+                  speakerNotes = await callClaude(notesPrompt, 15000)
+                } catch (claudeError) {
+                  console.log(`Claude failed for speaker notes on slide ${index + 1}, trying OpenRouter...`)
+                  try {
+                    speakerNotes = await callKimiK2(notesPrompt, 15000)
+                  } catch (openrouterError) {
+                    speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                  }
+                }
+              } else {
+                try {
+                  console.log(`Trying OpenRouter for speaker notes on slide ${index + 1}...`)
+                  speakerNotes = await callKimiK2(notesPrompt, 15000)
+                } catch (openrouterError) {
+                  console.log(`OpenRouter also failed for speaker notes on slide ${index + 1}:`, openrouterError)
+                  speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                }
               }
             } else {
               // Wait before retry
