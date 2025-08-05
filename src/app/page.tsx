@@ -9,7 +9,7 @@ export default function Home() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-bold text-text-primary mb-4 animate-fade-in">
-            Welcome to Email Template Generator
+            Welcome to EmailAi By Muminur
           </h1>
           <p className="text-lg md:text-xl text-text-secondary mb-8 animate-fade-in max-w-2xl mx-auto">
             Transform your emails with AI-powered templates and personalized training. 

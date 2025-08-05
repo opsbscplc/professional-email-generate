@@ -34,11 +34,15 @@ deployment-credentials.txt
 vercel-config.json
 health-report.json
 
-# sensitive files
+# sensitive files - NEVER COMMIT THESE
+deployment-credentials.txt
 **/credentials.*
 **/*credentials*
 **/*secrets*
 **/config/production.*
+.env.production
+.env.local
+health-report.json
 
 # vercel
 .vercel

@@ -34,14 +34,20 @@ export const testApiKey = withCache(
       '/api/gemini/test',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({}),
       },
       async () => {
         const res = await fetch('/api/gemini/test', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey }),
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({}),
         })
         
         if (!res.ok) {
@@ -81,7 +87,6 @@ export async function enhanceEmailWithTemplate(
     }
 
     const requestBody = {
-      apiKey,
       prompt: draftEmail,
       template,
     }
@@ -90,13 +95,19 @@ export async function enhanceEmailWithTemplate(
       '/api/gemini',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify(requestBody),
       },
       async () => {
         const response = await fetch('/api/gemini', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
           body: JSON.stringify(requestBody),
         })
 
@@ -203,7 +214,6 @@ export async function generateEmailWithTraining(
     }
 
     const requestBody = {
-      apiKey,
       prompt: testInput,
       trainingData,
     }
@@ -212,13 +222,19 @@ export async function generateEmailWithTraining(
       '/api/gemini',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify(requestBody),
       },
       async () => {
         const response = await fetch('/api/gemini', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
           body: JSON.stringify(requestBody),
         })
 

@@ -170,8 +170,8 @@ function constructPrompt(request: GeminiRequest): string {
   }
 
   // Template-based prompt
-  if (template && TEMPLATE_PROMPTS[template]) {
-    return `${TEMPLATE_PROMPTS[template]}
+  if (template && template in TEMPLATE_PROMPTS) {
+    return `${TEMPLATE_PROMPTS[template as keyof typeof TEMPLATE_PROMPTS]}
 
 Original email:
 ${prompt}

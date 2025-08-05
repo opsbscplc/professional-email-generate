@@ -20,16 +20,16 @@ export function Header() {
           <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
             <div className="text-xl md:text-2xl">📧</div>
             <div className="hidden sm:block">
-              <h1 className="text-base md:text-lg font-bold text-text-primary">
-                Email Template Generator
+              <h1 className="text-base md:text-lg font-bold" style={{ color: '#1877F2' }}>
+                EmailAi By Muminur
               </h1>
-              <p className="text-xs text-text-secondary">
+              <p className="text-xs" style={{ color: '#42A5F5' }}>
                 AI-powered email enhancement
               </p>
             </div>
             <div className="sm:hidden">
-              <h1 className="text-sm font-bold text-text-primary">
-                Email Generator
+              <h1 className="text-sm font-bold" style={{ color: '#1877F2' }}>
+                EmailAi By Muminur
               </h1>
             </div>
           </Link>
@@ -40,9 +40,10 @@ export function Header() {
               href="/template-enhancer" 
               className={`text-sm transition-colors px-3 py-2 rounded-lg ${
                 isActive('/template-enhancer') 
-                  ? 'text-accent-primary bg-white/10' 
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                  ? 'bg-white/10' 
+                  : 'hover:bg-white/5'
               }`}
+              style={{ color: isActive('/template-enhancer') ? '#1877F2' : '#42A5F5' }}
             >
               Template Enhancer
             </Link>
@@ -50,9 +51,10 @@ export function Header() {
               href="/trainer" 
               className={`text-sm transition-colors px-3 py-2 rounded-lg ${
                 isActive('/trainer') 
-                  ? 'text-accent-primary bg-white/10' 
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                  ? 'bg-white/10' 
+                  : 'hover:bg-white/5'
               }`}
+              style={{ color: isActive('/trainer') ? '#1877F2' : '#42A5F5' }}
             >
               AI Trainer
             </Link>
@@ -86,9 +88,10 @@ export function Header() {
                 href="/template-enhancer" 
                 className={`text-sm transition-colors px-3 py-2 rounded-lg ${
                   isActive('/template-enhancer') 
-                    ? 'text-accent-primary bg-white/10' 
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    ? 'bg-white/10' 
+                    : 'hover:bg-white/5'
                 }`}
+                style={{ color: isActive('/template-enhancer') ? '#1877F2' : '#42A5F5' }}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 📧 Template Enhancer
@@ -97,9 +100,10 @@ export function Header() {
                 href="/trainer" 
                 className={`text-sm transition-colors px-3 py-2 rounded-lg ${
                   isActive('/trainer') 
-                    ? 'text-accent-primary bg-white/10' 
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    ? 'bg-white/10' 
+                    : 'hover:bg-white/5'
                 }`}
+                style={{ color: isActive('/trainer') ? '#1877F2' : '#42A5F5' }}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 🤖 AI Trainer

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useApiKey } from '@/contexts/ApiKeyContext'
-import { EmailTemplate, GeminiRequest, GeminiResponse } from '@/types'
+import { EmailTemplate, GeminiRequest, GeminiResponse } from '@/types/gemini'
 import { TemplateSelector } from '@/components/TemplateSelector'
 import { EmailEditor, EmailComparison } from '@/components/EmailEditor'
 import { GlassCard } from '@/components/ui/GlassCard'

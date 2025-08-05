@@ -3,7 +3,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey } = await request.json()
+    // Get API key from Authorization header
+    const authHeader = request.headers.get('authorization')
+    const apiKey = authHeader?.replace('Bearer ', '')
 
     if (!apiKey) {
       return NextResponse.json(

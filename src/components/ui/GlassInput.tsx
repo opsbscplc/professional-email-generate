@@ -1,77 +1,151 @@
-import React from 'react'
+'use client'
+
+import React, { useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
 
-export interface GlassInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string
-  error?: string
-  blur?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
-  opacity?: 'low' | 'medium' | 'high'
+interface GlassInputProps {
+  type?: 'text' | 'email' | 'password' | 'url'
+  placeholder?: string
+  value?: string
+  onChange?: (value: string) => void
+  className?: string
+  disabled?: boolean
+  required?: boolean
+  autoFocus?: boolean
+  onFocus?: () => void
+  onBlur?: () => void
+  error?: boolean
+  icon?: React.ReactNode
   rightIcon?: React.ReactNode
 }
 
-const blurClasses = {
-  sm: 'backdrop-blur-sm',
-  md: 'backdrop-blur-md',
-  lg: 'backdrop-blur-lg',
-  xl: 'backdrop-blur-xl',
-  '2xl': 'backdrop-blur-2xl',
-  '3xl': 'backdrop-blur-3xl',
-}
-
-const opacityClasses = {
-  low: 'bg-white/5',
-  medium: 'bg-white/10',
-  high: 'bg-white/20',
-}
-
 export function GlassInput({
-  label,
-  error,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
   className,
-  blur = 'md',
-  opacity = 'medium',
-  rightIcon,
-  id,
-  ...props
+  disabled = false,
+  required = false,
+  autoFocus = false,
+  onFocus,
+  onBlur,
+  error = false,
+  icon,
+  rightIcon
 }: GlassInputProps) {
-  const inputId = id || `glass-input-${Math.random().toString(36).substr(2, 9)}`
+  const [isFocused, setIsFocused] = useState(false)
+  const [hasValue, setHasValue] = useState(!!value)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleFocus = () => {
+    setIsFocused(true)
+    onFocus?.()
+  }
+
+  const handleBlur = () => {
+    setIsFocused(false)
+    onBlur?.()
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    setHasValue(!!newValue)
+    onChange?.(newValue)
+  }
 
   return (
-    <div className="space-y-2">
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-text-primary"
-        >
-          {label}
-        </label>
+    <div className={cn(
+      'relative group transition-all duration-300',
+      className
+    )}>
+      {/* Background with glass effect */}
+      <div className={cn(
+        'absolute inset-0 rounded-xl backdrop-blur-md border transition-all duration-300',
+        isFocused 
+          ? 'bg-white/15 border-white/30 shadow-lg shadow-blue-500/20' 
+          : 'bg-white/10 border-white/20',
+        error && 'border-red-400/50 bg-red-500/10',
+        disabled && 'opacity-50 cursor-not-allowed'
+      )} />
+
+      {/* Glow effect on focus */}
+      {isFocused && (
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 blur-sm -z-10 animate-pulse" />
       )}
-      <div className="relative">
-        <input
-          id={inputId}
-          className={cn(
-            'w-full px-4 py-3 rounded-lg border border-white/20 shadow-lg transition-all duration-300',
-            'text-text-primary placeholder-text-secondary/60',
-            'focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/40',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            blurClasses[blur],
-            opacityClasses[opacity],
-            error && 'border-red-400 focus:ring-red-400/50',
-            rightIcon && 'pr-12',
-            className
-          )}
-          {...props}
-        />
+
+      {/* Input container */}
+      <div className="relative flex items-center">
+        {/* Left Icon */}
+        {icon && (
+          <div className={cn(
+            'absolute left-4 z-10 transition-all duration-300',
+            isFocused ? 'text-white scale-110' : 'text-white/70',
+            error && 'text-red-400'
+          )}>
+            {icon}
+          </div>
+        )}
+
+        {/* Right Icon */}
         {rightIcon && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+          <div className={cn(
+            'absolute right-4 z-10 transition-all duration-300',
+            isFocused ? 'text-white scale-110' : 'text-white/70',
+            error && 'text-red-400'
+          )}>
             {rightIcon}
           </div>
         )}
+
+        {/* Input field */}
+        <input
+          ref={inputRef}
+          type={type}
+          value={value}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          autoFocus={autoFocus}
+          className={cn(
+            'w-full bg-transparent border-none outline-none text-white placeholder-white/50 transition-all duration-300',
+            'px-4 py-3 text-sm font-medium',
+            icon ? 'pl-12' : 'pl-4',
+            rightIcon ? 'pr-12' : 'pr-4',
+            isFocused && 'placeholder-white/70',
+            error && 'text-red-100 placeholder-red-300/50'
+          )}
+        />
+
+        {/* Floating label effect */}
+        {placeholder && (isFocused || hasValue) && (
+          <div className={cn(
+            'absolute left-4 -top-2 px-2 text-xs font-medium transition-all duration-300 pointer-events-none',
+            'bg-gradient-to-r from-transparent via-black/20 to-transparent backdrop-blur-sm rounded',
+            isFocused ? 'text-white scale-105' : 'text-white/70',
+            error && 'text-red-400',
+            icon && 'left-12'
+          )}>
+            {placeholder}
+          </div>
+        )}
       </div>
-      {error && (
-        <p className="text-sm text-red-400 mt-1">
-          {error}
-        </p>
+
+      {/* Animated border */}
+      <div className={cn(
+        'absolute bottom-0 left-1/2 transform -translate-x-1/2 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-300',
+        isFocused ? 'w-full via-blue-400/60' : 'w-0',
+        error && 'via-red-400/60'
+      )} />
+
+      {/* Shimmer effect */}
+      {isFocused && (
+        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer" />
+        </div>
       )}
     </div>
   )

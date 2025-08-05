@@ -1,70 +1,112 @@
+'use client'
+
 import React from 'react'
 import { cn } from '@/lib/utils'
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  variant?: 'default' | 'dots' | 'pulse' | 'gradient'
   className?: string
   text?: string
 }
 
-const sizeClasses = {
-  sm: 'w-4 h-4',
-  md: 'w-6 h-6',
-  lg: 'w-8 h-8',
-  xl: 'w-12 h-12',
-}
+export function LoadingSpinner({
+  size = 'md',
+  variant = 'default',
+  className,
+  text
+}: LoadingSpinnerProps) {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+    xl: 'w-12 h-12'
+  }
 
-export function LoadingSpinner({ size = 'md', className, text }: LoadingSpinnerProps) {
-  return (
-    <div className={cn('flex flex-col items-center justify-center', className)}>
-      <div className="relative" role="status" aria-label="Loading">
-        {/* Outer ring */}
-        <div
-          className={cn(
-            'border-4 border-white/20 rounded-full animate-spin',
-            sizeClasses[size]
-          )}
-        />
-        {/* Inner spinning ring */}
-        <div
-          className={cn(
-            'absolute top-0 left-0 border-4 border-transparent border-t-accent-primary rounded-full animate-spin',
-            sizeClasses[size]
-          )}
-        />
-        {/* Glass effect overlay */}
-        <div
-          className={cn(
-            'absolute top-1 left-1 border-2 border-white/40 rounded-full glass-shimmer',
-            size === 'sm' && 'w-2 h-2',
-            size === 'md' && 'w-4 h-4',
-            size === 'lg' && 'w-6 h-6',
-            size === 'xl' && 'w-10 h-10'
-          )}
-        />
+  const textSizeClasses = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base',
+    xl: 'text-lg'
+  }
+
+  if (variant === 'dots') {
+    return (
+      <div className={cn('flex flex-col items-center gap-3', className)}>
+        <div className="loading-dots">
+          <span className={cn('bg-white', sizeClasses[size])} />
+          <span className={cn('bg-white', sizeClasses[size])} />
+          <span className={cn('bg-white', sizeClasses[size])} />
+        </div>
+        {text && (
+          <div className={cn('text-white/70 font-medium', textSizeClasses[size])}>
+            {text}
+          </div>
+        )}
       </div>
+    )
+  }
+
+  if (variant === 'pulse') {
+    return (
+      <div className={cn('flex flex-col items-center gap-3', className)}>
+        <div className={cn(
+          'rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-pulse',
+          sizeClasses[size]
+        )} />
+        {text && (
+          <div className={cn('text-white/70 font-medium', textSizeClasses[size])}>
+            {text}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (variant === 'gradient') {
+    return (
+      <div className={cn('flex flex-col items-center gap-3', className)}>
+        <div className={cn(
+          'rounded-full border-2 border-transparent bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-spin',
+          sizeClasses[size]
+        )}>
+          <div className={cn(
+            'rounded-full bg-black/20 backdrop-blur-sm',
+            size === 'sm' ? 'w-3 h-3' : size === 'md' ? 'w-5 h-5' : size === 'lg' ? 'w-7 h-7' : 'w-11 h-11'
+          )} />
+        </div>
+        {text && (
+          <div className={cn('text-white/70 font-medium', textSizeClasses[size])}>
+            {text}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Default spinner
+  return (
+    <div className={cn('flex flex-col items-center gap-3', className)}>
+      <div className={cn(
+        'animate-spin rounded-full border-2 border-white/20 border-t-white',
+        sizeClasses[size]
+      )} />
       {text && (
-        <p className="mt-3 text-sm text-text-secondary animate-pulse">
+        <div className={cn('text-white/70 font-medium', textSizeClasses[size])}>
           {text}
-        </p>
+        </div>
       )}
     </div>
   )
 }
 
-export function LoadingOverlay({ children, loading, text }: {
-  children: React.ReactNode
-  loading: boolean
-  text?: string
-}) {
+// Inline loading component for buttons
+export function InlineSpinner({ className }: { className?: string }) {
   return (
-    <div className="relative">
-      {children}
-      {loading && (
-        <div className="absolute inset-0 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
-          <LoadingSpinner size="lg" text={text} />
-        </div>
-      )}
+    <div className={cn('loading-dots', className)}>
+      <span className="w-1 h-1 bg-current rounded-full" />
+      <span className="w-1 h-1 bg-current rounded-full" />
+      <span className="w-1 h-1 bg-current rounded-full" />
     </div>
   )
 }

@@ -1,6 +1,13 @@
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-})
+// Conditionally load bundle analyzer only if available
+let withBundleAnalyzer
+try {
+  withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+  })
+} catch (error) {
+  // Bundle analyzer not available, use identity function
+  withBundleAnalyzer = (config) => config
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

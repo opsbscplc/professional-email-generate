@@ -2,22 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modern CSS Variables */
 :root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+  
+  /* Glass morphism variables */
   --glass-bg: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.2);
-  --glass-shadow: rgba(0, 0, 0, 0.1);
-  --accent-primary: #007AFF;
-  --accent-secondary: #5856D6;
-  --text-primary: #1D1D1F;
-  --text-secondary: #86868B;
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  
+  /* Animation variables */
+  --animation-speed: 0.3s;
+  --animation-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --animation-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Facebook blue theme colors */
+  --text-primary: #1877F2;
+  --text-secondary: #42A5F5;
+  --text-tertiary: #90CAF9;
+  --accent-primary: #1877F2;
+  --accent-secondary: #42A5F5;
+}
+
+/* Enhanced body with dark animated gradient */
+body {
+  color: #1877F2; /* Facebook blue */
+  background: linear-gradient(
+    -45deg,
+    #0f0f23,
+    #1a1a2e,
+    #16213e,
+    #0f3460,
+    #1e3a8a,
+    #1e1b4b,
+    #0f0f23
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 20s ease infinite;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 @layer base {
   * {
-    @apply border-gray-200;
+    @apply border-blue-400/30;
   }
-  body {
-    @apply text-text-primary;
+  
+  h1, h2, h3, h4, h5, h6 {
+    color: #1877F2 !important;
+    @apply font-bold;
+  }
+  
+  p {
+    color: #42A5F5 !important;
+  }
+  
+  a {
+    color: #1877F2 !important;
+    @apply hover:opacity-80 transition-colors;
   }
 }
 
@@ -54,12 +98,193 @@
   background: rgba(255, 255, 255, 0.5);
 }
 
-/* Glass morphism animations */
-@keyframes glass-shimmer {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
+/* Animated gradient background */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
-.glass-shimmer {
-  animation: glass-shimmer 2s ease-in-out infinite;
+/* Floating particles animation */
+.floating-particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
+
+.particle {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.1;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 0.3;
+  }
+}
+
+/* Modern scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Utility classes for animations */
+.animate-fade-in {
+  animation: fadeIn 0.8s var(--animation-smooth) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s var(--animation-bounce) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.6s var(--animation-smooth) forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.6s var(--animation-smooth) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.5s var(--animation-bounce) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Text animations */
+.text-gradient {
+  background: linear-gradient(45deg, #1877F2, #42A5F5, #90CAF9, #1877F2);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 3s ease infinite;
+}
+
+/* Facebook blue text utilities */
+.text-primary {
+  color: #1877F2 !important;
+}
+
+.text-secondary {
+  color: #42A5F5 !important;
+}
+
+.text-tertiary {
+  color: #90CAF9 !important;
+}
+
+.text-facebook-blue {
+  color: #1877F2 !important;
+}
+
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }

@@ -37,8 +37,9 @@ export function ApiKeyInput({ onValidKey, className }: ApiKeyInputProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${inputValue.trim()}`
         },
-        body: JSON.stringify({ apiKey: inputValue.trim() }),
+        body: JSON.stringify({}),
       })
 
       if (!testResponse.ok) {
@@ -63,8 +64,8 @@ export function ApiKeyInput({ onValidKey, className }: ApiKeyInputProps) {
     setError(null)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value)
+  const handleInputChange = (value: string) => {
+    setInputValue(value)
     if (error) setError(null) // Clear error when user starts typing
   }
 
@@ -86,7 +87,7 @@ export function ApiKeyInput({ onValidKey, className }: ApiKeyInputProps) {
             value={inputValue}
             onChange={handleInputChange}
             placeholder="Enter your Google Gemini API key..."
-            error={error || undefined}
+            error={!!error}
             rightIcon={
               <button
                 type="button"

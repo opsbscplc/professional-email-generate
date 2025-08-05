@@ -29,7 +29,7 @@ export function ApiKeyStatus({ className, showFullInput = false }: ApiKeyStatusP
       <div className={className}>
         <GlassCard className="p-4">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-text-primary">API Key Setup</h3>
+            <h3 className="font-semibold" style={{ color: '#1877F2' }}>API Key Setup</h3>
             {!showFullInput && (
               <GlassButton
                 variant="ghost"
@@ -57,7 +57,7 @@ export function ApiKeyStatus({ className, showFullInput = false }: ApiKeyStatusP
             }`}
             title={isValid ? 'API key is valid' : 'API key required'}
           />
-          <span className="text-sm text-text-secondary">
+          <span className="text-sm" style={{ color: '#1877F2' }}>
             {isValid ? 'API Connected' : 'API Required'}
           </span>
         </div>
@@ -97,7 +97,7 @@ export function ApiKeyStatus({ className, showFullInput = false }: ApiKeyStatusP
 
       {/* Masked API Key Display */}
       {isValid && apiKey && (
-        <div className="mt-2 text-xs text-text-secondary font-mono">
+        <div className="mt-2 text-xs font-mono" style={{ color: '#42A5F5' }}>
           {apiKey.substring(0, 8)}...{apiKey.substring(apiKey.length - 4)}
         </div>
       )}
@@ -114,10 +114,10 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
         <div className="max-w-md w-full">
           <GlassCard className="p-6 text-center">
             <div className="text-4xl mb-4">🔑</div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#1877F2' }}>
               API Key Required
             </h2>
-            <p className="text-text-secondary mb-6">
+            <p className="mb-6" style={{ color: '#42A5F5' }}>
               Please enter your Google Gemini API key to use the email template generator.
             </p>
             <ApiKeyStatus showFullInput />
