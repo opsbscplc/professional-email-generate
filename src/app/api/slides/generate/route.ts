@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate speaker notes for each slide
+    // Generate speaker notes for each slide using only Gemini
     const slidesWithNotes = await Promise.all(
       slides.map(async (slide: any, index: number) => {
         const notesPrompt = `Create natural, humanized speaker notes for this presentation slide about "${topic}":
@@ -153,41 +153,33 @@ Return only the speaker notes text, nothing else.`
 
         let speakerNotes = ''
 
-        // Try the same service that worked for slides first
-        if (usingFallback) {
-          // Use OpenRouter for speaker notes
-          try {
-            speakerNotes = await callOpenRouter(notesPrompt, 15000)
-          } catch (openrouterError) {
-            console.log('OpenRouter failed for speaker notes, trying Gemini...')
-            try {
-              const genAI = new GoogleGenerativeAI(apiKey)
-              const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
-              const notesResult = await model.generateContent(notesPrompt)
-              const notesResponse = await notesResult.response
-              speakerNotes = notesResponse.text().trim()
-            } catch (geminiError) {
-              speakerNotes = 'Speaker notes could not be generated for this slide.'
-            }
-          }
-        } else {
-          // Use Gemini for speaker notes
+        // Use Gemini for speaker notes with retry logic
+        let retryCount = 0
+        const maxRetries = 2
+        
+        while (retryCount <= maxRetries) {
           try {
             const genAI = new GoogleGenerativeAI(apiKey)
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+            
             const notesTimeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 15000)
+              setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 10000)
             })
+            
             const notesPromise = model.generateContent(notesPrompt)
             const notesResult = await Promise.race([notesPromise, notesTimeoutPromise]) as any
             const notesResponse = await notesResult.response
             speakerNotes = notesResponse.text().trim()
+            break // Success, exit retry loop
           } catch (geminiError) {
-            console.log('Gemini failed for speaker notes, trying OpenRouter...')
-            try {
-              speakerNotes = await callOpenRouter(notesPrompt, 15000)
-            } catch (openrouterError) {
-              speakerNotes = 'Speaker notes could not be generated for this slide.'
+            retryCount++
+            console.log(`Gemini speaker notes attempt ${retryCount} failed for slide ${index + 1}:`, geminiError)
+            
+            if (retryCount > maxRetries) {
+              speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}.`
+            } else {
+              // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
             }
           }
         }
