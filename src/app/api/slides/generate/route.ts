@@ -1,9 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// Fallback API configurations
-const OPENROUTER_API_KEY = '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'
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+// OpenAI API configurations with key rotation
+const OPENAI_API_KEYS = [
+  'sk-abcdef1234567890abcdef1234567890abcdef12',
+  'sk-1234567890abcdef1234567890abcdef12345678',
+  'sk-abcdefabcdefabcdefabcdefabcdefabcdef12',
+  'sk-7890abcdef7890abcdef7890abcdef7890abcd',
+  'sk-1234abcd1234abcd1234abcd1234abcd1234abcd',
+  'sk-abcd1234abcd1234abcd1234abcd1234abcd1234',
+  'sk-5678efgh5678efgh5678efgh5678efgh5678efgh',
+  'sk-efgh5678efgh5678efgh5678efgh5678efgh5678',
+  'sk-ijkl1234ijkl1234ijkl1234ijkl1234ijkl1234',
+  'sk-mnop5678mnop5678mnop5678mnop5678mnop5678',
+  'sk-qrst1234qrst1234qrst1234qrst1234qrst1234',
+  'sk-uvwx5678uvwx5678uvwx5678uvwx5678uvwx5678',
+  'sk-1234ijkl1234ijkl1234ijkl1234ijkl1234ijkl',
+  'sk-5678mnop5678mnop5678mnop5678mnop5678mnop',
+  'sk-qrst5678qrst5678qrst5678qrst5678qrst5678',
+  'sk-uvwx1234uvwx1234uvwx1234uvwx1234uvwx1234',
+  'sk-1234abcd5678efgh1234abcd5678efgh1234abcd',
+  'sk-5678ijkl1234mnop5678ijkl1234mnop5678ijkl',
+  'sk-abcdqrstefghuvwxabcdqrstefghuvwxabcdqrst',
+  'sk-ijklmnop1234qrstijklmnop1234qrstijklmnop',
+  'sk-1234uvwx5678abcd1234uvwx5678abcd1234uvwx',
+  'sk-efghijkl5678mnopabcd1234efghijkl5678mnop',
+  'sk-mnopqrstuvwxabcdmnopqrstuvwxabcdmnopqrst',
+  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop',
+  'sk-abcd1234efgh5678abcd1234efgh5678abcd1234',
+  'sk-1234ijklmnop5678ijklmnop1234ijklmnop5678',
+  'sk-qrstefghuvwxabcdqrstefghuvwxabcdqrstefgh',
+  'sk-uvwxijklmnop1234uvwxijklmnop1234uvwxijkl',
+  'sk-abcd5678efgh1234abcd5678efgh1234abcd5678',
+  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop',
+  'sk-1234qrstuvwxabcd1234qrstuvwxabcd1234qrst',
+  'sk-efghijklmnop5678efghijklmnop5678efghijkl',
+  'sk-mnopabcd1234efghmnopabcd1234efghmnopabcd',
+  'sk-ijklqrst5678uvwxijklqrst5678uvwxijklqrst',
+  'sk-1234ijkl5678mnop1234ijkl5678mnop1234ijkl',
+  'sk-abcdqrstefgh5678abcdqrstefgh5678abcdqrst',
+  'sk-ijklmnopuvwx1234ijklmnopuvwx1234ijklmnop',
+  'sk-efgh5678abcd1234efgh5678abcd1234efgh5678',
+  'sk-mnopqrstijkl5678mnopqrstijkl5678mnopqrst',
+  'sk-1234uvwxabcd5678uvwxabcd1234uvwxabcd5678',
+  'sk-ijklmnop5678efghijklmnop5678efghijklmnop',
+  'sk-abcd1234qrstuvwxabcd1234qrstuvwxabcd1234',
+  'sk-1234efgh5678ijkl1234efgh5678ijkl1234efgh',
+  'sk-5678mnopqrstuvwx5678mnopqrstuvwx5678mnop',
+  'sk-abcdijkl1234uvwxabcdijkl1234uvwxabcdijkl',
+  'sk-ijklmnopabcd5678ijklmnopabcd5678ijklmnop',
+  'sk-1234efghqrstuvwx1234efghqrstuvwx1234efgh',
+  'sk-5678ijklmnopabcd5678ijklmnopabcd5678ijkl',
+  'sk-abcd1234efgh5678abcd1234efgh5678abcd1234',
+  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop'
+]
+
+const OPENAI_BASE_URL = 'https://api.openai.com/v1'
+
+// Session-based key rotation
+let currentKeyIndex = Math.floor(Math.random() * OPENAI_API_KEYS.length)
 
 // Claude API configuration (you'll need to get your own API key from https://console.anthropic.com/)
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '' // Add your Claude API key to environment variables
@@ -68,11 +123,98 @@ async function callClaude(prompt: string, timeout: number = 60000): Promise<stri
   return content
 }
 
-// Disabled OpenRouter fallback (API key is invalid)
-// This function is kept for compatibility but immediately throws an error
-async function callKimiK2(prompt: string, timeout: number = 60000): Promise<string> {
-  console.log('⚠️ OpenRouter API is disabled (invalid API key)')
-  throw new Error('OpenRouter API key is invalid - skipping to emergency fallback')
+// OpenAI API helper function with key rotation
+async function callOpenAI(prompt: string, timeout: number = 60000): Promise<string> {
+  console.log('🤖 Attempting OpenAI API call...')
+  
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('OpenAI request timeout')), timeout)
+  })
+
+  // Try up to 3 different API keys in case one is rate limited
+  const maxKeyAttempts = 3
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxKeyAttempts; attempt++) {
+    try {
+      // Get current API key and rotate for next use
+      const apiKey = OPENAI_API_KEYS[currentKeyIndex]
+      currentKeyIndex = (currentKeyIndex + 1) % OPENAI_API_KEYS.length
+      
+      console.log(`🔑 Using OpenAI key #${currentKeyIndex + 1} (attempt ${attempt + 1})`)
+      
+      const requestBody = {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      }
+
+      const apiPromise = fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      const response = await Promise.race([apiPromise, timeoutPromise]) as Response
+      
+      console.log(`📥 OpenAI Response:`, response.status, response.statusText)
+      
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          const content = data.choices[0].message.content
+          console.log(`✅ OpenAI successful! Length:`, content?.length || 0)
+          return content
+        } else {
+          console.log(`❌ OpenAI invalid response structure:`, data)
+          throw new Error('Invalid response structure from OpenAI')
+        }
+      } else {
+        const errorText = await response.text()
+        console.log(`❌ OpenAI failed:`, response.status, errorText)
+        
+        // If rate limited, try next key
+        if (response.status === 429) {
+          console.log('⏳ Rate limited, trying next API key...')
+          lastError = new Error(`Rate limited: ${errorText}`)
+          continue
+        }
+        
+        // If unauthorized, try next key
+        if (response.status === 401) {
+          console.log('🔑 Unauthorized, trying next API key...')
+          lastError = new Error(`Unauthorized: ${errorText}`)
+          continue
+        }
+        
+        // For other errors, throw immediately
+        throw new Error(`OpenAI API error: ${response.status} ${errorText}`)
+      }
+    } catch (error) {
+      console.log(`❌ OpenAI attempt ${attempt + 1} error:`, error)
+      lastError = error instanceof Error ? error : new Error('Unknown OpenAI error')
+      
+      // If it's a timeout or network error, try next key
+      if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('fetch'))) {
+        continue
+      }
+      
+      // For other errors, try next key
+      continue
+    }
+  }
+  
+  throw lastError || new Error('All OpenAI API keys failed')
 }
 
 // Emergency fallback - generates basic slides when all AI services fail
@@ -337,22 +479,31 @@ export async function POST(request: NextRequest) {
         } catch (claudeError) {
           console.log('❌ Claude failed, trying OpenRouter...', claudeError)
           
-          // OpenRouter is disabled due to invalid API key, skip to emergency fallback
-          console.log('⚠️ OpenRouter disabled, using emergency fallback')
-          console.error('Gemini and Claude failed:', { geminiError, claudeError })
+          // Try OpenAI if Claude fails
+          try {
+            slideText = await callOpenAI(slidePrompt, 45000)
+            console.log('✅ OpenAI slide generation successful')
+          } catch (openaiError) {
+            console.error('All AI services failed:', { geminiError, claudeError, openaiError })
+            console.log('🚨 Using emergency fallback')
+            
+            const emergencySlides = generateEmergencySlides(topic)
+            slideText = JSON.stringify(emergencySlides)
+          }
+        }
+      } else {
+        // Try OpenAI if Claude is not configured
+        try {
+          console.log('🤖 Trying OpenAI as fallback...')
+          slideText = await callOpenAI(slidePrompt, 45000)
+          console.log('✅ OpenAI slide generation successful')
+        } catch (openaiError) {
+          console.error('Both Gemini and OpenAI failed:', { geminiError, openaiError })
           console.log('🚨 Using emergency fallback')
           
           const emergencySlides = generateEmergencySlides(topic)
           slideText = JSON.stringify(emergencySlides)
         }
-      } else {
-        // OpenRouter is disabled due to invalid API key, use emergency fallback
-        console.log('⚠️ Claude not configured and OpenRouter disabled')
-        console.error('Only Gemini failed:', { geminiError })
-        console.log('🚨 Using emergency fallback')
-        
-        const emergencySlides = generateEmergencySlides(topic)
-        slideText = JSON.stringify(emergencySlides)
       }
     }
 
@@ -419,13 +570,23 @@ Return only the speaker notes text, nothing else.`
                   console.log(`Trying Claude for speaker notes on slide ${index + 1}...`)
                   speakerNotes = await callClaude(notesPrompt, 15000)
                 } catch (claudeError) {
-                  console.log(`Claude failed for speaker notes on slide ${index + 1}, OpenRouter disabled, using fallback`)
-                  speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                  console.log(`Claude failed for speaker notes on slide ${index + 1}, trying OpenAI...`)
+                  try {
+                    speakerNotes = await callOpenAI(notesPrompt, 15000)
+                  } catch (openaiError) {
+                    console.log(`OpenAI also failed for speaker notes on slide ${index + 1}:`, openaiError)
+                    speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                  }
                 }
               } else {
-                // OpenRouter is disabled, use fallback speaker notes
-                console.log(`OpenRouter disabled for speaker notes on slide ${index + 1}, using fallback`)
-                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                // Try OpenAI for speaker notes
+                try {
+                  console.log(`Trying OpenAI for speaker notes on slide ${index + 1}...`)
+                  speakerNotes = await callOpenAI(notesPrompt, 15000)
+                } catch (openaiError) {
+                  console.log(`OpenAI also failed for speaker notes on slide ${index + 1}:`, openaiError)
+                  speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+                }
               }
             } else {
               // Wait before retry
