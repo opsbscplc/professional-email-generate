@@ -1,6 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+// OpenRouter fallback configuration
+const OPENROUTER_API_KEY = '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'
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
+
+// OpenRouter API helper function
+async function callOpenRouter(prompt: string, timeout: number = 45000): Promise<string> {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('OpenRouter request timeout')), timeout)
+  })
+
+  const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://professional-email-generate.vercel.app',
+      'X-Title': 'Email Template Generator'
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-3.5-sonnet',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
+    })
+  })
+
+  const response = await Promise.race([apiPromise, timeoutPromise]) as Response
+  
+  if (!response.ok) {
+    throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    throw new Error('Invalid response from OpenRouter API')
+  }
+
+  return data.choices[0].message.content
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { topic, theme, apiKey } = await request.json()
@@ -19,11 +65,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const genAI = new GoogleGenerativeAI(apiKey)
-    
-    // Use the most reliable current model
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
     // Generate slide content
     const slidePrompt = `Create a comprehensive presentation about "${topic}" with exactly 20 slides. 
@@ -45,30 +86,34 @@ export async function POST(request: NextRequest) {
     
     Return only the JSON array, no additional text.`
 
-    // Generate slides with retry logic
     let slideText
-    let retryCount = 0
-    const maxRetries = 3
-    
-    while (retryCount < maxRetries) {
-      try {
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout - slide generation took too long')), 45000)
-        })
+    let usingFallback = false
 
-        const slidePromise = model.generateContent(slidePrompt)
-        const slideResult = await Promise.race([slidePromise, timeoutPromise]) as any
-        const slideResponse = await slideResult.response
-        slideText = slideResponse.text()
-        break // Success, exit retry loop
-      } catch (retryError) {
-        retryCount++
-        if (retryCount >= maxRetries) {
-          throw retryError // Re-throw the last error
-        }
-        console.log(`Slide generation attempt ${retryCount} failed, retrying...`)
-        // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+    // Try Gemini first
+    try {
+      console.log('Attempting slide generation with Gemini...')
+      const genAI = new GoogleGenerativeAI(apiKey)
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Gemini request timeout')), 30000)
+      })
+
+      const slidePromise = model.generateContent(slidePrompt)
+      const slideResult = await Promise.race([slidePromise, timeoutPromise]) as any
+      const slideResponse = await slideResult.response
+      slideText = slideResponse.text()
+      console.log('Gemini slide generation successful')
+    } catch (geminiError) {
+      console.log('Gemini failed, falling back to OpenRouter...', geminiError)
+      usingFallback = true
+      
+      try {
+        slideText = await callOpenRouter(slidePrompt, 45000)
+        console.log('OpenRouter slide generation successful')
+      } catch (openrouterError) {
+        console.error('Both Gemini and OpenRouter failed:', { geminiError, openrouterError })
+        throw new Error('All AI services are currently unavailable. Please try again later.')
       }
     }
 
@@ -104,15 +149,46 @@ Generate speaker notes that:
 
 Return only the speaker notes text, nothing else.`
 
-        // Add timeout to speaker notes generation
-        const notesTimeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout - speaker notes generation took too long')), 15000)
-        })
+        let speakerNotes = ''
 
-        const notesPromise = model.generateContent(notesPrompt)
-        const notesResult = await Promise.race([notesPromise, notesTimeoutPromise]) as any
-        const notesResponse = await notesResult.response
-        const speakerNotes = notesResponse.text().trim()
+        // Try the same service that worked for slides first
+        if (usingFallback) {
+          // Use OpenRouter for speaker notes
+          try {
+            speakerNotes = await callOpenRouter(notesPrompt, 15000)
+          } catch (openrouterError) {
+            console.log('OpenRouter failed for speaker notes, trying Gemini...')
+            try {
+              const genAI = new GoogleGenerativeAI(apiKey)
+              const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+              const notesResult = await model.generateContent(notesPrompt)
+              const notesResponse = await notesResult.response
+              speakerNotes = notesResponse.text().trim()
+            } catch (geminiError) {
+              speakerNotes = 'Speaker notes could not be generated for this slide.'
+            }
+          }
+        } else {
+          // Use Gemini for speaker notes
+          try {
+            const genAI = new GoogleGenerativeAI(apiKey)
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+            const notesTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 15000)
+            })
+            const notesPromise = model.generateContent(notesPrompt)
+            const notesResult = await Promise.race([notesPromise, notesTimeoutPromise]) as any
+            const notesResponse = await notesResult.response
+            speakerNotes = notesResponse.text().trim()
+          } catch (geminiError) {
+            console.log('Gemini failed for speaker notes, trying OpenRouter...')
+            try {
+              speakerNotes = await callOpenRouter(notesPrompt, 15000)
+            } catch (openrouterError) {
+              speakerNotes = 'Speaker notes could not be generated for this slide.'
+            }
+          }
+        }
 
         return {
           id: `slide-${index + 1}`,
