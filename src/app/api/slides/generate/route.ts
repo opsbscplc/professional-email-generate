@@ -9,31 +9,7 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '' // Add your Claude API key to environment variables
 const CLAUDE_BASE_URL = 'https://api.anthropic.com/v1'
 
-// Test OpenRouter API key validity
-async function testOpenRouterKey(): Promise<boolean> {
-  try {
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://professional-email-generate.vercel.app',
-        'X-Title': 'Email Template Generator'
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'test' }],
-        max_tokens: 1
-      })
-    })
-    
-    console.log('🔑 OpenRouter key test response:', response.status)
-    return response.status !== 401
-  } catch (error) {
-    console.error('🔑 OpenRouter key test failed:', error)
-    return false
-  }
-}
+
 
 // Claude API helper function
 async function callClaude(prompt: string, timeout: number = 60000): Promise<string> {
@@ -92,34 +68,25 @@ async function callClaude(prompt: string, timeout: number = 60000): Promise<stri
   return content
 }
 
-// OpenRouter KIMI K2 API helper function with comprehensive error handling
+// OpenRouter API helper function with working free models
 async function callKimiK2(prompt: string, timeout: number = 60000): Promise<string> {
-  console.log('🚀 Attempting KIMI K2 API call...')
-  
-  // First test if the API key works at all
-  const keyValid = await testOpenRouterKey()
-  if (!keyValid) {
-    console.error('❌ OpenRouter API key is invalid or expired')
-    throw new Error('OpenRouter API key authentication failed')
-  }
-  
-  console.log('✅ OpenRouter API key is valid')
+  console.log('🚀 Attempting OpenRouter API call...')
   
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('KIMI K2 request timeout')), timeout)
+    setTimeout(() => reject(new Error('OpenRouter request timeout')), timeout)
   })
 
-  // Try different model configurations
+  // Use working free models from OpenRouter
   const modelConfigs = [
-    { model: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
-    { model: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku' },
-    { model: 'meta-llama/llama-3-8b-instruct:free', name: 'Llama 3 8B' },
-    { model: 'microsoft/wizardlm-2-8x22b', name: 'WizardLM 2' }
+    { model: 'meta-llama/llama-3.1-8b-instruct:free', name: 'Llama 3.1 8B Free' },
+    { model: 'microsoft/phi-3-mini-128k-instruct:free', name: 'Phi-3 Mini Free' },
+    { model: 'google/gemma-2-9b-it:free', name: 'Gemma 2 9B Free' },
+    { model: 'qwen/qwen-2-7b-instruct:free', name: 'Qwen 2 7B Free' }
   ]
 
   for (const config of modelConfigs) {
     try {
-      console.log(`🧪 Trying ${config.name} (${config.model})...`)
+      console.log(`🧪 Trying ${config.name}...`)
       
       const requestBody = {
         model: config.model,
@@ -130,7 +97,8 @@ async function callKimiK2(prompt: string, timeout: number = 60000): Promise<stri
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 4000,
+        stream: false
       }
 
       const apiPromise = fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
@@ -146,27 +114,40 @@ async function callKimiK2(prompt: string, timeout: number = 60000): Promise<stri
 
       const response = await Promise.race([apiPromise, timeoutPromise]) as Response
       
-      console.log(`📥 ${config.name} Response status:`, response.status, response.statusText)
+      console.log(`📥 ${config.name} Response:`, response.status, response.statusText)
       
       if (response.ok) {
         const data = await response.json()
+        console.log(`📊 ${config.name} Response structure:`, JSON.stringify(data, null, 2))
         
-        if (data.choices && data.choices[0] && data.choices[0].message) {
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
           const content = data.choices[0].message.content
-          console.log(`✅ ${config.name} successful! Response length:`, content?.length || 0)
+          console.log(`✅ ${config.name} successful! Length:`, content?.length || 0)
           return content
+        } else {
+          console.log(`❌ ${config.name} invalid response structure:`, data)
         }
       } else {
         const errorText = await response.text()
         console.log(`❌ ${config.name} failed:`, response.status, errorText)
+        
+        // If we get 401, the API key is definitely invalid, so stop trying
+        if (response.status === 401) {
+          throw new Error('OpenRouter API key is invalid or expired')
+        }
       }
     } catch (error) {
       console.log(`❌ ${config.name} error:`, error)
+      
+      // If it's an auth error, don't continue trying other models
+      if (error instanceof Error && error.message.includes('invalid or expired')) {
+        throw error
+      }
       continue
     }
   }
   
-  throw new Error('All OpenRouter models failed')
+  throw new Error('All OpenRouter models failed - API key may be invalid')
 }
 
 // Emergency fallback - generates basic slides when all AI services fail
