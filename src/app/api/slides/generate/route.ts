@@ -20,7 +20,7 @@ async function callOpenRouter(prompt: string, timeout: number = 45000): Promise<
       'X-Title': 'Email Template Generator'
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-3.5-sonnet',
+      model: 'deepseek/deepseek-chat',
       messages: [
         {
           role: 'user',
@@ -35,6 +35,8 @@ async function callOpenRouter(prompt: string, timeout: number = 45000): Promise<
   const response = await Promise.race([apiPromise, timeoutPromise]) as Response
   
   if (!response.ok) {
+    const errorText = await response.text()
+    console.error('OpenRouter API error details:', errorText)
     throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`)
   }
 
