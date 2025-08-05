@@ -15,7 +15,9 @@ async function callKimiK2(prompt: string, timeout: number = 45000): Promise<stri
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://professional-email-generate.vercel.app',
+      'X-Title': 'Email Template Generator'
     },
     body: JSON.stringify({
       model: 'moonshotai/kimi-k2:free',
@@ -24,7 +26,9 @@ async function callKimiK2(prompt: string, timeout: number = 45000): Promise<stri
           role: 'user',
           content: prompt
         }
-      ]
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
     })
   })
 
