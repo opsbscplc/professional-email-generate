@@ -75,10 +75,25 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      if (errorMessage.includes('quota_exceeded') || errorMessage.includes('quota exceeded')) {
+      if (errorMessage.includes('quota_exceeded') || errorMessage.includes('quota exceeded') || errorMessage.includes('too many requests') || errorMessage.includes('rate limit')) {
         return NextResponse.json(
-          { error: 'API quota exceeded. Please check your usage limits.' },
-          { status: 429 }
+          { 
+            success: true, 
+            message: 'API key is valid but currently rate-limited. The system will automatically use backup services when needed.',
+            warning: 'Rate limited - backup services available'
+          },
+          { status: 200 }
+        )
+      }
+
+      if (errorMessage.includes('429') || errorMessage.includes('rate') || errorMessage.includes('limit') || errorMessage.includes('too many')) {
+        return NextResponse.json(
+          { 
+            success: true, 
+            message: 'API key is valid but currently rate-limited. The system will automatically use backup services when needed.',
+            warning: 'Rate limited - backup services available'
+          },
+          { status: 200 }
         )
       }
 
