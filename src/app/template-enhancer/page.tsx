@@ -97,7 +97,7 @@ export default function TemplateEnhancerPage() {
       })
     } catch (error) {
       // Detailed error logging for debugging
-      console.error('❌ Enhancement Error - Full Details:', {
+      const errorDetails = {
         errorType: error?.constructor?.name,
         errorMessage: error instanceof Error ? error.message : String(error),
         errorCode: error instanceof AppError ? error.code : undefined,
@@ -105,7 +105,8 @@ export default function TemplateEnhancerPage() {
         userMessage: error instanceof AppError ? error.userMessage : undefined,
         stack: error instanceof Error ? error.stack : undefined,
         timestamp: new Date().toISOString()
-      })
+      }
+      console.error('❌ Enhancement Error - Full Details:', JSON.stringify(errorDetails, null, 2))
 
       const appError = error instanceof AppError ? error : new AppError(
         error instanceof Error ? error.message : 'An unexpected error occurred'

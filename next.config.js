@@ -97,7 +97,7 @@ const nextConfig = {
               value: 'http',
             },
           ],
-          destination: 'https://your-domain.vercel.app/$1',
+          destination: 'https://professional-email-generate.vercel.app/$1',
           permanent: true,
         },
       ]

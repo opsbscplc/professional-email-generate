@@ -15,7 +15,8 @@
   },
   "functions": {
     "app/api/**/*.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "headers": [
@@ -49,7 +50,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://your-app.vercel.app"
+          "value": "https://professional-email-generate.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",

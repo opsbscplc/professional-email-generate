@@ -130,7 +130,9 @@ export async function enhanceEmailWithTemplate(
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          console.error('❌ API Error Response:', errorData)
+          console.error('❌ API Error Response:', JSON.stringify(errorData, null, 2))
+          console.error('❌ API Error Status:', response.status)
+          console.error('❌ API Error StatusText:', response.statusText)
           throw parseGeminiApiError(response, errorData)
         }
 
@@ -148,13 +150,13 @@ export async function enhanceEmailWithTemplate(
     return result
   } catch (error) {
     const appError = parseApiError(error)
-    console.error('❌ Template Enhancement Error:', {
-      error: appError,
+    console.error('❌ Template Enhancement Error:', JSON.stringify({
       code: appError.code,
       status: appError.status,
       message: appError.message,
-      userMessage: appError.userMessage
-    })
+      userMessage: appError.userMessage,
+      stack: appError.stack
+    }, null, 2))
     return {
       success: false,
       error: appError.userMessage

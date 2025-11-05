@@ -295,9 +295,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // Initialize Gemini AI with error handling
+    let genAI: GoogleGenerativeAI
+    let model: any
+
+    try {
+      genAI = new GoogleGenerativeAI(apiKey)
+      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    } catch (initError) {
+      console.error('Failed to initialize Google Generative AI:', initError)
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to initialize AI service. Please verify your API key and try again.',
+          details: process.env.NODE_ENV === 'development' && initError instanceof Error ? initError.message : undefined
+        },
+        { status: 500 }
+      )
+      return applySecurityHeaders(response)
+    }
 
     // Construct the prompt with sanitized data
     const sanitizedBody = {
@@ -344,10 +360,44 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Gemini API error:', error)
+    // Enhanced error logging with stack trace - using JSON.stringify for Vercel logs
+    console.error('=== GEMINI API ERROR START ===')
+    console.error('Error object:', JSON.stringify({
+      type: error?.constructor?.name,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cause: error instanceof Error ? (error as any).cause : undefined
+    }, null, 2))
+    console.error('=== GEMINI API ERROR END ===')
+
+    // Log the full error details for debugging
+    if (error instanceof Error) {
+      console.error('Detailed Error Info:', JSON.stringify({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        cause: (error as any).cause
+      }, null, 2))
+    }
 
     // Handle specific error types
     if (error instanceof Error) {
+      // Module import/dependency errors
+      if (error.message.includes('Cannot find module') ||
+          error.message.includes('@google/generative-ai') ||
+          error.message.includes('MODULE_NOT_FOUND')) {
+        console.error('CRITICAL: Missing dependency detected')
+        const response = NextResponse.json(
+          {
+            success: false,
+            error: 'Server configuration error. Missing required dependency. Please contact support.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+          },
+          { status: 500 }
+        )
+        return applySecurityHeaders(response)
+      }
+
       // API key related errors
       if (error.message.includes('API_KEY_INVALID') || error.message.includes('invalid API key')) {
         logRequest(await request.json().catch(() => ({})), false, 'Invalid API key')
@@ -419,10 +469,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generic error handling
-    logRequest(await request.json().catch(() => ({})), false, error instanceof Error ? error.message : 'Unknown error')
+    // Generic error handling with more details
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    logRequest(await request.json().catch(() => ({})), false, errorMessage)
+
     const response = NextResponse.json(
-      { success: false, error: 'Failed to process request. Please try again.' },
+      {
+        success: false,
+        error: 'Failed to process request. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     )
     return applySecurityHeaders(response)
