@@ -34,20 +34,40 @@ export async function POST(request: NextRequest) {
 
       const apiPromise = model.generateContent('Hi')
       const result = await Promise.race([apiPromise, timeoutPromise]) as any
-      
+
       if (!result || !result.response) {
         throw new Error('No response from Gemini API')
       }
 
-      const responseText = result.response.text()
+      // Check if response was blocked or has issues before calling text()
+      const response = result.response
+
+      // Check for prompt feedback (blocking)
+      if (response.promptFeedback && response.promptFeedback.blockReason) {
+        throw new Error(`Content was blocked due to ${response.promptFeedback.blockReason}`)
+      }
+
+      // Check if candidates exist
+      if (!response.candidates || response.candidates.length === 0) {
+        throw new Error('No response candidates generated')
+      }
+
+      // Now safely get the text
+      let responseText: string
+      try {
+        responseText = response.text()
+      } catch (textError) {
+        throw new Error('Unable to extract text from response')
+      }
+
       if (!responseText) {
         throw new Error('Empty response from Gemini API')
       }
 
       // If we get here, the API key is valid
-      return NextResponse.json({ 
-        success: true, 
-        message: 'API key is valid' 
+      return NextResponse.json({
+        success: true,
+        message: 'API key is valid'
       })
 
     } catch (apiError) {
@@ -55,8 +75,13 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('API key validation error:', error)
-    
+    // Enhanced error logging for debugging
+    console.error('API key validation error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      error: error
+    })
+
     // Handle specific Gemini API errors
     if (error instanceof Error) {
       const errorMessage = error.message.toLowerCase()
