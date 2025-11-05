@@ -319,8 +319,41 @@ export async function POST(request: NextRequest) {
         throw new Error('No response from Gemini API')
       }
 
-      const responseText = result.response.text()
-      
+      // Check if response was blocked or has issues before calling text()
+      const response = result.response
+
+      // Check for prompt feedback (blocking)
+      if (response.promptFeedback && response.promptFeedback.blockReason) {
+        const blockReason = response.promptFeedback.blockReason
+        throw new Error(`SAFETY: Content was blocked due to ${blockReason}`)
+      }
+
+      // Check if candidates exist
+      if (!response.candidates || response.candidates.length === 0) {
+        throw new Error('SAFETY: No response candidates generated. The content may have triggered safety filters.')
+      }
+
+      // Check finish reason
+      const candidate = response.candidates[0]
+      const finishReason = candidate.finishReason
+
+      if (finishReason === 'SAFETY') {
+        throw new Error('SAFETY: Response was blocked by safety filters')
+      } else if (finishReason === 'RECITATION') {
+        throw new Error('SAFETY: Response contained recitation of copyrighted content')
+      } else if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+        throw new Error(`Response generation stopped unexpectedly: ${finishReason}`)
+      }
+
+      // Now safely get the text
+      let responseText: string
+      try {
+        responseText = response.text()
+      } catch (textError) {
+        // If text() fails, provide a helpful error message
+        throw new Error('SAFETY: Unable to extract text from response. The content may have been blocked by safety filters.')
+      }
+
       if (!responseText || responseText.trim().length === 0) {
         throw new Error('Empty response from Gemini API')
       }
@@ -331,12 +364,12 @@ export async function POST(request: NextRequest) {
       // Log successful request
       logRequest(body, true)
 
-      const response = NextResponse.json({
+      const responseJson = NextResponse.json({
         success: true,
         data: cleanedResponse
       })
-      
-      return applySecurityHeaders(response)
+
+      return applySecurityHeaders(responseJson)
 
     } catch (apiError) {
       clearTimeout(timeoutId)
@@ -344,12 +377,18 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Gemini API error:', error)
+    // Enhanced error logging for debugging
+    console.error('Gemini API error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: error
+    })
 
     // Handle specific error types
     if (error instanceof Error) {
       // API key related errors
-      if (error.message.includes('API_KEY_INVALID') || error.message.includes('invalid API key')) {
+      if (error.message.includes('API_KEY_INVALID') || error.message.includes('invalid API key') || error.message.includes('API key not valid')) {
         logRequest(await request.json().catch(() => ({})), false, 'Invalid API key')
         const response = NextResponse.json(
           { success: false, error: 'Invalid API key. Please check your Google Gemini API key.' },
