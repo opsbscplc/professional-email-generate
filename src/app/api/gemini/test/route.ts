@@ -34,12 +34,19 @@ export async function POST(request: NextRequest) {
 
       const apiPromise = model.generateContent('Hi')
       const result = await Promise.race([apiPromise, timeoutPromise]) as any
-      
+
       if (!result || !result.response) {
         throw new Error('No response from Gemini API')
       }
 
-      const responseText = await result.response.text()
+      // Check for blocked content before calling text()
+      const response = result.response
+      if (!response.candidates || response.candidates.length === 0) {
+        throw new Error('Response was blocked by API')
+      }
+
+      // text() is synchronous, not async
+      const responseText = response.text()
       if (!responseText) {
         throw new Error('Empty response from Gemini API')
       }

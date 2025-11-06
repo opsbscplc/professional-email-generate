@@ -337,8 +337,50 @@ export async function POST(request: NextRequest) {
         throw new Error('No response from Gemini API')
       }
 
-      // CRITICAL FIX: response.text() is async and MUST be awaited
-      const responseText = await result.response.text()
+      // CRITICAL FIX: Check for blocked content before calling text()
+      // The text() method throws an error if content is blocked or has no candidates
+      const response = result.response
+
+      // Check if response has candidates
+      if (!response.candidates || response.candidates.length === 0) {
+        console.error('No candidates in response:', JSON.stringify({
+          promptFeedback: response.promptFeedback,
+          candidates: response.candidates
+        }, null, 2))
+        throw new Error('Response was blocked. The AI could not generate content for this request.')
+      }
+
+      // Check finish reason and safety ratings
+      const candidate = response.candidates[0]
+      if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        console.error('Content generation stopped:', JSON.stringify({
+          finishReason: candidate.finishReason,
+          safetyRatings: candidate.safetyRatings
+        }, null, 2))
+
+        if (candidate.finishReason === 'SAFETY') {
+          throw new Error('Content violates safety policies. Please modify your email and try again.')
+        } else if (candidate.finishReason === 'RECITATION') {
+          throw new Error('Response blocked due to recitation. Please rephrase your request.')
+        } else if (candidate.finishReason === 'MAX_TOKENS') {
+          throw new Error('Response too long. Please try with shorter content.')
+        } else {
+          throw new Error(`Content generation stopped: ${candidate.finishReason}`)
+        }
+      }
+
+      // Now safely call text() - it's synchronous, not async
+      let responseText: string
+      try {
+        responseText = response.text()
+      } catch (textError) {
+        console.error('Error calling response.text():', textError)
+        console.error('Response structure:', JSON.stringify({
+          candidates: response.candidates,
+          promptFeedback: response.promptFeedback
+        }, null, 2))
+        throw new Error('Failed to extract text from AI response. The content may have been filtered.')
+      }
 
       if (!responseText || responseText.trim().length === 0) {
         throw new Error('Empty response from Gemini API')
@@ -350,12 +392,12 @@ export async function POST(request: NextRequest) {
       // Log successful request
       logRequest(body, true)
 
-      const response = NextResponse.json({
+      const apiResponse = NextResponse.json({
         success: true,
         data: cleanedResponse
       })
-      
-      return applySecurityHeaders(response)
+
+      return applySecurityHeaders(apiResponse)
 
     } catch (apiError) {
       clearTimeout(timeoutId)
