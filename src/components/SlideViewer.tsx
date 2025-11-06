@@ -8,6 +8,7 @@ import { SpeakerNotes } from '@/components/SpeakerNotes'
 import { SlideNavigation } from '@/components/SlideNavigation'
 import { cn } from '@/lib/utils'
 import pptxgen from 'pptxgenjs'
+import { jsPDF } from 'jspdf'
 
 interface SlideViewerProps {
   presentation: SlidePresentation
@@ -173,6 +174,105 @@ export function SlideViewer({
     ppt.writeFile({ fileName: filename })
   }
 
+  const exportToPDF = () => {
+    // Create PDF in landscape mode (presentation format)
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    })
+
+    // Theme color mappings (RGB values for PDF)
+    const themeColorsRGB: Record<SlideTheme, { bg: [number, number, number]; title: [number, number, number]; content: [number, number, number]; accent: [number, number, number] }> = {
+      [SlideTheme.MODERN]: {
+        bg: [102, 126, 234],
+        title: [255, 255, 255],
+        content: [248, 250, 252],
+        accent: [240, 147, 251]
+      },
+      [SlideTheme.CORPORATE]: {
+        bg: [30, 58, 138],
+        title: [255, 255, 255],
+        content: [229, 231, 235],
+        accent: [96, 165, 250]
+      },
+      [SlideTheme.CREATIVE]: {
+        bg: [245, 158, 11],
+        title: [255, 255, 255],
+        content: [254, 243, 199],
+        accent: [251, 191, 36]
+      },
+      [SlideTheme.MINIMAL]: {
+        bg: [249, 250, 251],
+        title: [17, 24, 39],
+        content: [55, 65, 81],
+        accent: [107, 115, 128]
+      },
+      [SlideTheme.DARK]: {
+        bg: [17, 24, 39],
+        title: [249, 250, 251],
+        content: [209, 213, 219],
+        accent: [6, 182, 212]
+      }
+    }
+
+    const colors = themeColorsRGB[presentation.theme]
+
+    presentation.slides.forEach((slide, index) => {
+      if (index > 0) {
+        pdf.addPage()
+      }
+
+      // Set background color
+      pdf.setFillColor(colors.bg[0], colors.bg[1], colors.bg[2])
+      pdf.rect(0, 0, 297, 210, 'F')
+
+      // Add slide number (top right)
+      pdf.setFontSize(10)
+      pdf.setTextColor(colors.content[0], colors.content[1], colors.content[2])
+      pdf.text(slide.slideNumber.toString(), 285, 15, { align: 'right' })
+
+      // Add title
+      pdf.setFontSize(24)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(colors.title[0], colors.title[1], colors.title[2])
+
+      // Word wrap title if too long
+      const titleLines = pdf.splitTextToSize(slide.title, 250)
+      pdf.text(titleLines, 20, 40)
+
+      // Add content bullets
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(colors.content[0], colors.content[1], colors.content[2])
+
+      let yPosition = 70
+      slide.content.forEach((point, i) => {
+        // Word wrap content
+        const contentLines = pdf.splitTextToSize(`• ${point}`, 250)
+        pdf.text(contentLines, 25, yPosition)
+        yPosition += contentLines.length * 8 + 5
+      })
+
+      // Add watermark (bottom left)
+      pdf.setFontSize(8)
+      pdf.setTextColor(colors.content[0], colors.content[1], colors.content[2], 0.6)
+      pdf.text('EmailAi By Muminur', 20, 195)
+
+      // Add speaker notes as text on a separate area (small font at bottom)
+      if (slide.speakerNotes) {
+        pdf.setFontSize(7)
+        pdf.setTextColor(colors.content[0], colors.content[1], colors.content[2], 0.5)
+        const notesLines = pdf.splitTextToSize(`Notes: ${slide.speakerNotes}`, 250)
+        pdf.text(notesLines, 20, 200)
+      }
+    })
+
+    // Save the PDF
+    const filename = `${presentation.topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_presentation.pdf`
+    pdf.save(filename)
+  }
+
   return (
     <div 
       className={cn(
@@ -211,11 +311,11 @@ export function SlideViewer({
           </GlassButton>
 
           <GlassButton
-            onClick={exportToJSON}
+            onClick={exportToPDF}
             variant="ghost"
             size="sm"
           >
-            💾 Export JSON
+            📄 Export PDF
           </GlassButton>
 
           <GlassButton
