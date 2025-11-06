@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { SlidePresentation, SlideTheme } from '@/types'
 import { GlassCard, GlassButton } from '@/components/ui'
 import { SlideDisplay } from '@/components/SlideDisplay'
@@ -17,17 +17,37 @@ interface SlideViewerProps {
   onReset: () => void
 }
 
-export function SlideViewer({ 
-  presentation, 
-  currentSlideIndex, 
-  onSlideNavigation, 
-  onReset 
+export function SlideViewer({
+  presentation,
+  currentSlideIndex,
+  onSlideNavigation,
+  onReset
 }: SlideViewerProps) {
   const [showSpeakerNotes, setShowSpeakerNotes] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false)
+
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   const currentSlide = presentation.slides[currentSlideIndex]
   const totalSlides = presentation.slides.length
+
+  // Handle outside clicks to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false)
+      }
+    }
+
+    if (isExportDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isExportDropdownOpen])
 
   const handlePrevious = () => {
     if (currentSlideIndex > 0) {
@@ -56,6 +76,7 @@ export function SlideViewer({
     link.download = `${presentation.topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_slides.json`
     link.click()
     URL.revokeObjectURL(url)
+    setIsExportDropdownOpen(false)
   }
 
   const exportToPowerPoint = () => {
@@ -172,6 +193,7 @@ export function SlideViewer({
     // Save the presentation
     const filename = `${presentation.topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_presentation.pptx`
     ppt.writeFile({ fileName: filename })
+    setIsExportDropdownOpen(false)
   }
 
   const exportToPDF = () => {
@@ -271,6 +293,7 @@ export function SlideViewer({
     // Save the PDF
     const filename = `${presentation.topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_presentation.pdf`
     pdf.save(filename)
+    setIsExportDropdownOpen(false)
   }
 
   return (
@@ -301,7 +324,7 @@ export function SlideViewer({
           >
             {showSpeakerNotes ? '📝 Hide Notes' : '📝 Speaker Notes'}
           </GlassButton>
-          
+
           <GlassButton
             onClick={() => setIsFullscreen(!isFullscreen)}
             variant="ghost"
@@ -310,21 +333,75 @@ export function SlideViewer({
             {isFullscreen ? '🔲 Exit Fullscreen' : '🔳 Fullscreen'}
           </GlassButton>
 
-          <GlassButton
-            onClick={exportToPDF}
-            variant="ghost"
-            size="sm"
-          >
-            📄 Export PDF
-          </GlassButton>
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <GlassButton
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              variant="ghost"
+              size="sm"
+            >
+              💾 Export {isExportDropdownOpen ? '▲' : '▼'}
+            </GlassButton>
 
-          <GlassButton
-            onClick={exportToPowerPoint}
-            variant="ghost"
-            size="sm"
-          >
-            📊 Export PPT
-          </GlassButton>
+            {/* Dropdown Menu */}
+            {isExportDropdownOpen && (
+              <div
+                className="absolute right-0 mt-2 w-56 rounded-xl overflow-hidden shadow-2xl z-50"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+                }}
+              >
+                <button
+                  onClick={exportToPDF}
+                  className="w-full px-4 py-3 text-left flex items-center gap-3 transition-all hover:bg-white/50"
+                  style={{ color: '#1877F2' }}
+                >
+                  <span className="text-lg">📄</span>
+                  <div className="flex-1">
+                    <div className="font-medium">Export as PDF</div>
+                    <div className="text-xs opacity-70">Portable Document Format</div>
+                  </div>
+                </button>
+
+                <div
+                  className="h-px mx-2"
+                  style={{ background: 'rgba(24, 119, 242, 0.1)' }}
+                />
+
+                <button
+                  onClick={exportToPowerPoint}
+                  className="w-full px-4 py-3 text-left flex items-center gap-3 transition-all hover:bg-white/50"
+                  style={{ color: '#1877F2' }}
+                >
+                  <span className="text-lg">📊</span>
+                  <div className="flex-1">
+                    <div className="font-medium">Export as PowerPoint</div>
+                    <div className="text-xs opacity-70">Microsoft PowerPoint (.pptx)</div>
+                  </div>
+                </button>
+
+                <div
+                  className="h-px mx-2"
+                  style={{ background: 'rgba(24, 119, 242, 0.1)' }}
+                />
+
+                <button
+                  onClick={exportToJSON}
+                  className="w-full px-4 py-3 text-left flex items-center gap-3 transition-all hover:bg-white/50"
+                  style={{ color: '#1877F2' }}
+                >
+                  <span className="text-lg">💾</span>
+                  <div className="flex-1">
+                    <div className="font-medium">Export as JSON</div>
+                    <div className="text-xs opacity-70">Raw presentation data</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
           <GlassButton
             onClick={onReset}
