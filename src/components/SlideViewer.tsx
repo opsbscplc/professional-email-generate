@@ -7,6 +7,7 @@ import { SlideDisplay } from '@/components/SlideDisplay'
 import { SpeakerNotes } from '@/components/SpeakerNotes'
 import { SlideNavigation } from '@/components/SlideNavigation'
 import { cn } from '@/lib/utils'
+import pptxgen from 'pptxgenjs'
 
 interface SlideViewerProps {
   presentation: SlidePresentation
@@ -56,6 +57,122 @@ export function SlideViewer({
     URL.revokeObjectURL(url)
   }
 
+  const exportToPowerPoint = () => {
+    const ppt = new pptxgen()
+
+    // Theme color mappings
+    const themeColors: Record<SlideTheme, { bg: string; title: string; content: string; accent: string }> = {
+      [SlideTheme.MODERN]: {
+        bg: '667eea',
+        title: 'ffffff',
+        content: 'f8fafc',
+        accent: 'f093fb'
+      },
+      [SlideTheme.CORPORATE]: {
+        bg: '1e3a8a',
+        title: 'ffffff',
+        content: 'e5e7eb',
+        accent: '60a5fa'
+      },
+      [SlideTheme.CREATIVE]: {
+        bg: 'f59e0b',
+        title: 'ffffff',
+        content: 'fef3c7',
+        accent: 'fbbf24'
+      },
+      [SlideTheme.MINIMAL]: {
+        bg: 'f9fafb',
+        title: '111827',
+        content: '374151',
+        accent: '6b7280'
+      },
+      [SlideTheme.DARK]: {
+        bg: '111827',
+        title: 'f9fafb',
+        content: 'd1d5db',
+        accent: '06b6d4'
+      }
+    }
+
+    const colors = themeColors[presentation.theme]
+
+    // Configure presentation properties
+    ppt.author = 'EmailAi By Muminur'
+    ppt.title = presentation.topic
+    ppt.subject = `${presentation.theme} theme presentation`
+
+    // Create slides
+    presentation.slides.forEach((slide) => {
+      const pptSlide = ppt.addSlide()
+
+      // Set background color
+      pptSlide.background = { color: colors.bg }
+
+      // Add slide number (top right)
+      pptSlide.addText(slide.slideNumber.toString(), {
+        x: 9.0,
+        y: 0.3,
+        w: 0.8,
+        h: 0.3,
+        fontSize: 12,
+        color: colors.content,
+        align: 'right'
+      })
+
+      // Add title
+      pptSlide.addText(slide.title, {
+        x: 0.5,
+        y: 1.5,
+        w: 9.0,
+        h: 1.2,
+        fontSize: 36,
+        bold: true,
+        color: colors.title,
+        align: 'left',
+        valign: 'top'
+      })
+
+      // Add content bullets
+      if (slide.content.length > 0) {
+        pptSlide.addText(
+          slide.content.map(point => ({ text: point, options: { bullet: true } })),
+          {
+            x: 0.8,
+            y: 3.0,
+            w: 8.5,
+            h: 3.5,
+            fontSize: 18,
+            color: colors.content,
+            align: 'left',
+            valign: 'top',
+            lineSpacing: 32
+          }
+        )
+      }
+
+      // Add watermark (bottom left)
+      pptSlide.addText('EmailAi By Muminur', {
+        x: 0.3,
+        y: 7.0,
+        w: 3.0,
+        h: 0.3,
+        fontSize: 10,
+        color: colors.content,
+        align: 'left',
+        transparency: 60
+      })
+
+      // Add speaker notes
+      if (slide.speakerNotes) {
+        pptSlide.addNotes(slide.speakerNotes)
+      }
+    })
+
+    // Save the presentation
+    const filename = `${presentation.topic.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_presentation.pptx`
+    ppt.writeFile({ fileName: filename })
+  }
+
   return (
     <div 
       className={cn(
@@ -98,7 +215,15 @@ export function SlideViewer({
             variant="ghost"
             size="sm"
           >
-            💾 Export
+            💾 Export JSON
+          </GlassButton>
+
+          <GlassButton
+            onClick={exportToPowerPoint}
+            variant="ghost"
+            size="sm"
+          >
+            📊 Export PPT
           </GlassButton>
 
           <GlassButton
