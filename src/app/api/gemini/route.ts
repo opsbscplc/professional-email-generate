@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
   let body: GeminiRequest | null = null
 
   try {
-    body = await request.json()
+    body = await request.json() as GeminiRequest
     const { prompt, template, trainingData } = body
     
     // Get API key from Authorization header
