@@ -464,7 +464,7 @@ export async function POST(request: NextRequest) {
       const slidePromise = model.generateContent(slidePrompt)
       const slideResult = await Promise.race([slidePromise, timeoutPromise]) as any
       const slideResponse = await slideResult.response
-      slideText = slideResponse.text()
+      slideText = await slideResponse.text()
       console.log('Gemini slide generation successful')
     } catch (geminiError) {
       console.log('Gemini failed, trying fallback services...', geminiError)
@@ -557,7 +557,7 @@ Return only the speaker notes text, nothing else.`
             const notesPromise = model.generateContent(notesPrompt)
             const notesResult = await Promise.race([notesPromise, notesTimeoutPromise]) as any
             const notesResponse = await notesResult.response
-            speakerNotes = notesResponse.text().trim()
+            speakerNotes = (await notesResponse.text()).trim()
             break // Success, exit retry loop
           } catch (geminiError) {
             retryCount++

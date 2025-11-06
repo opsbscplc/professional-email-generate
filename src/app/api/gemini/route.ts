@@ -226,8 +226,10 @@ function logRequest(request: GeminiRequest, success: boolean, error?: string) {
 }
 
 export async function POST(request: NextRequest) {
+  let body: GeminiRequest | null = null
+
   try {
-    const body: GeminiRequest = await request.json()
+    body = await request.json()
     const { prompt, template, trainingData } = body
     
     // Get API key from Authorization header
@@ -335,8 +337,9 @@ export async function POST(request: NextRequest) {
         throw new Error('No response from Gemini API')
       }
 
-      const responseText = result.response.text()
-      
+      // CRITICAL FIX: response.text() is async and MUST be awaited
+      const responseText = await result.response.text()
+
       if (!responseText || responseText.trim().length === 0) {
         throw new Error('Empty response from Gemini API')
       }
@@ -360,127 +363,145 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    // Enhanced error logging with stack trace - using JSON.stringify for Vercel logs
-    console.error('=== GEMINI API ERROR START ===')
-    console.error('Error object:', JSON.stringify({
-      type: error?.constructor?.name,
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      cause: error instanceof Error ? (error as any).cause : undefined
-    }, null, 2))
-    console.error('=== GEMINI API ERROR END ===')
-
-    // Log the full error details for debugging
-    if (error instanceof Error) {
-      console.error('Detailed Error Info:', JSON.stringify({
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        cause: (error as any).cause
+    // CRITICAL: Ensure we ALWAYS return valid JSON, even if error handling fails
+    try {
+      // Enhanced error logging with stack trace - using JSON.stringify for Vercel logs
+      console.error('=== GEMINI API ERROR START ===')
+      console.error('Error object:', JSON.stringify({
+        type: error?.constructor?.name,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? (error as any).cause : undefined
       }, null, 2))
-    }
+      console.error('=== GEMINI API ERROR END ===')
 
-    // Handle specific error types
-    if (error instanceof Error) {
-      // Module import/dependency errors
-      if (error.message.includes('Cannot find module') ||
-          error.message.includes('@google/generative-ai') ||
-          error.message.includes('MODULE_NOT_FOUND')) {
-        console.error('CRITICAL: Missing dependency detected')
-        const response = NextResponse.json(
-          {
-            success: false,
-            error: 'Server configuration error. Missing required dependency. Please contact support.',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      // Log the full error details for debugging
+      if (error instanceof Error) {
+        console.error('Detailed Error Info:', JSON.stringify({
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          cause: (error as any).cause
+        }, null, 2))
+      }
+
+      // Handle specific error types
+      if (error instanceof Error) {
+        // Module import/dependency errors
+        if (error.message.includes('Cannot find module') ||
+            error.message.includes('@google/generative-ai') ||
+            error.message.includes('MODULE_NOT_FOUND')) {
+          console.error('CRITICAL: Missing dependency detected')
+          const response = NextResponse.json(
+            {
+              success: false,
+              error: 'Server configuration error. Missing required dependency. Please contact support.',
+              details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            },
+            { status: 500 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // API key related errors
+        if (error.message.includes('API_KEY_INVALID') || error.message.includes('invalid API key')) {
+          if (body) logRequest(body, false, 'Invalid API key')
+          const response = NextResponse.json(
+            { success: false, error: 'Invalid API key. Please check your Google Gemini API key.' },
+            { status: 401 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Permission errors
+        if (error.message.includes('PERMISSION_DENIED') || error.message.includes('permission denied')) {
+          if (body) logRequest(body, false, 'Permission denied')
+          const response = NextResponse.json(
+            { success: false, error: 'Permission denied. Please ensure your API key has the necessary permissions.' },
+            { status: 403 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Rate limiting errors
+        if (error.message.includes('QUOTA_EXCEEDED') || error.message.includes('quota exceeded') || error.message.includes('rate limit')) {
+          if (body) logRequest(body, false, 'Rate limit exceeded')
+          const response = NextResponse.json(
+            { success: false, error: 'API quota exceeded. Please check your usage limits or try again later.' },
+            { status: 429 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Timeout errors
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+          if (body) logRequest(body, false, 'Request timeout')
+          const response = NextResponse.json(
+            { success: false, error: 'Request timed out. Please try again with a shorter prompt.' },
+            { status: 408 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Content policy violations
+        if (error.message.includes('SAFETY') || error.message.includes('content policy')) {
+          if (body) logRequest(body, false, 'Content policy violation')
+          const response = NextResponse.json(
+            { success: false, error: 'Content violates safety policies. Please modify your email and try again.' },
+            { status: 400 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Training-specific errors
+        if (error.message.includes('training') || error.message.includes('pattern')) {
+          if (body) logRequest(body, false, 'Training pattern error')
+          const response = NextResponse.json(
+            { success: false, error: 'Unable to learn from the provided training example. Please ensure your training data shows a clear transformation pattern.' },
+            { status: 400 }
+          )
+          return applySecurityHeaders(response)
+        }
+
+        // Context length errors (common with training data)
+        if (error.message.includes('context_length') || error.message.includes('token limit')) {
+          if (body) logRequest(body, false, 'Context length exceeded')
+          const response = NextResponse.json(
+            { success: false, error: 'Training data and input are too long. Please shorten your content and try again.' },
+            { status: 400 }
+          )
+          return applySecurityHeaders(response)
+        }
+      }
+
+      // Generic error handling with more details
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (body) logRequest(body, false, errorMessage)
+
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to process request. Please try again.',
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        },
+        { status: 500 }
+      )
+      return applySecurityHeaders(response)
+    } catch (innerError) {
+      // LAST RESORT: If even error handling fails, return minimal valid JSON
+      console.error('CRITICAL: Error handler itself failed:', innerError)
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: 'Internal server error. Please try again later.',
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
           },
-          { status: 500 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // API key related errors
-      if (error.message.includes('API_KEY_INVALID') || error.message.includes('invalid API key')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Invalid API key')
-        const response = NextResponse.json(
-          { success: false, error: 'Invalid API key. Please check your Google Gemini API key.' },
-          { status: 401 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Permission errors
-      if (error.message.includes('PERMISSION_DENIED') || error.message.includes('permission denied')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Permission denied')
-        const response = NextResponse.json(
-          { success: false, error: 'Permission denied. Please ensure your API key has the necessary permissions.' },
-          { status: 403 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Rate limiting errors
-      if (error.message.includes('QUOTA_EXCEEDED') || error.message.includes('quota exceeded') || error.message.includes('rate limit')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Rate limit exceeded')
-        const response = NextResponse.json(
-          { success: false, error: 'API quota exceeded. Please check your usage limits or try again later.' },
-          { status: 429 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Timeout errors
-      if (error.name === 'AbortError' || error.message.includes('timeout')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Request timeout')
-        const response = NextResponse.json(
-          { success: false, error: 'Request timed out. Please try again with a shorter prompt.' },
-          { status: 408 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Content policy violations
-      if (error.message.includes('SAFETY') || error.message.includes('content policy')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Content policy violation')
-        const response = NextResponse.json(
-          { success: false, error: 'Content violates safety policies. Please modify your email and try again.' },
-          { status: 400 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Training-specific errors
-      if (error.message.includes('training') || error.message.includes('pattern')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Training pattern error')
-        const response = NextResponse.json(
-          { success: false, error: 'Unable to learn from the provided training example. Please ensure your training data shows a clear transformation pattern.' },
-          { status: 400 }
-        )
-        return applySecurityHeaders(response)
-      }
-
-      // Context length errors (common with training data)
-      if (error.message.includes('context_length') || error.message.includes('token limit')) {
-        logRequest(await request.json().catch(() => ({})), false, 'Context length exceeded')
-        const response = NextResponse.json(
-          { success: false, error: 'Training data and input are too long. Please shorten your content and try again.' },
-          { status: 400 }
-        )
-        return applySecurityHeaders(response)
-      }
+        }
+      )
     }
-
-    // Generic error handling with more details
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    logRequest(await request.json().catch(() => ({})), false, errorMessage)
-
-    const response = NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to process request. Please try again.',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-      },
-      { status: 500 }
-    )
-    return applySecurityHeaders(response)
   }
 }

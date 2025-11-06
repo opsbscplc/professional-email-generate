@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         throw new Error('No response from Gemini API')
       }
 
-      const responseText = result.response.text()
+      const responseText = await result.response.text()
       if (!responseText) {
         throw new Error('Empty response from Gemini API')
       }
