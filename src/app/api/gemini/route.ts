@@ -333,30 +333,54 @@ export async function POST(request: NextRequest) {
       const result = await model.generateContent(fullPrompt)
       clearTimeout(timeoutId)
 
-      if (!result.response) {
+      // CRITICAL: Log the raw result for debugging
+      console.error('=== GEMINI RAW RESULT ===')
+      console.error('Result type:', typeof result)
+      console.error('Has response:', !!result?.response)
+
+      if (!result || !result.response) {
+        console.error('CRITICAL: No result or response object returned')
+        console.error('Full result:', JSON.stringify(result, null, 2))
         throw new Error('No response from Gemini API')
       }
 
-      // CRITICAL FIX: Check for blocked content before calling text()
-      // The text() method throws an error if content is blocked or has no candidates
       const response = result.response
+
+      // CRITICAL: Log full response structure before validation
+      console.error('Response object keys:', Object.keys(response))
+      console.error('Prompt feedback:', JSON.stringify(response.promptFeedback, null, 2))
+      console.error('Candidates count:', response.candidates?.length || 0)
+
+      // Check for prompt-level blocking FIRST
+      if (response.promptFeedback?.blockReason) {
+        console.error('PROMPT BLOCKED:', response.promptFeedback.blockReason)
+        throw new Error(`Prompt was blocked: ${response.promptFeedback.blockReason}. Please modify your input.`)
+      }
 
       // Check if response has candidates
       if (!response.candidates || response.candidates.length === 0) {
-        console.error('No candidates in response:', JSON.stringify({
+        console.error('CRITICAL: No candidates in response')
+        console.error('Full response:', JSON.stringify({
           promptFeedback: response.promptFeedback,
-          candidates: response.candidates
+          candidates: response.candidates,
+          usageMetadata: (response as any).usageMetadata
         }, null, 2))
         throw new Error('Response was blocked. The AI could not generate content for this request.')
       }
 
-      // Check finish reason and safety ratings
+      // Log candidate details
       const candidate = response.candidates[0]
+      console.error('First candidate:', JSON.stringify({
+        finishReason: candidate.finishReason,
+        safetyRatings: candidate.safetyRatings,
+        hasContent: !!candidate.content,
+        partsCount: candidate.content?.parts?.length || 0
+      }, null, 2))
+
+      // Check finish reason and safety ratings
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        console.error('Content generation stopped:', JSON.stringify({
-          finishReason: candidate.finishReason,
-          safetyRatings: candidate.safetyRatings
-        }, null, 2))
+        console.error('Content generation stopped - finishReason:', candidate.finishReason)
+        console.error('Safety ratings:', JSON.stringify(candidate.safetyRatings, null, 2))
 
         if (candidate.finishReason === 'SAFETY') {
           throw new Error('Content violates safety policies. Please modify your email and try again.')
@@ -369,20 +393,41 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Check content parts structure before calling text()
+      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+        console.error('CRITICAL: No content parts in candidate')
+        console.error('Candidate structure:', JSON.stringify(candidate, null, 2))
+        throw new Error('No content generated. The response structure is invalid.')
+      }
+
       // Now safely call text() - it's synchronous, not async
       let responseText: string
       try {
+        // CRITICAL: The text() method can throw - catch and log the ACTUAL error
         responseText = response.text()
+        console.error('Successfully extracted text, length:', responseText?.length || 0)
       } catch (textError) {
-        console.error('Error calling response.text():', textError)
-        console.error('Response structure:', JSON.stringify({
-          candidates: response.candidates,
-          promptFeedback: response.promptFeedback
-        }, null, 2))
-        throw new Error('Failed to extract text from AI response. The content may have been filtered.')
+        // Log the ACTUAL error that text() threw
+        console.error('=== CRITICAL: response.text() threw an error ===')
+        console.error('Error type:', textError?.constructor?.name)
+        console.error('Error message:', textError instanceof Error ? textError.message : String(textError))
+        console.error('Error stack:', textError instanceof Error ? textError.stack : 'N/A')
+        console.error('Full error object:', JSON.stringify(textError, Object.getOwnPropertyNames(textError), 2))
+
+        // Try alternative access method
+        try {
+          const altText = candidate.content.parts[0].text
+          console.error('Alternative text extraction succeeded, length:', altText?.length || 0)
+          responseText = altText
+        } catch (altError) {
+          console.error('Alternative extraction also failed:', altError)
+          console.error('Full response structure:', JSON.stringify(response, null, 2))
+          throw new Error(`Failed to extract text: ${textError instanceof Error ? textError.message : 'Unknown error'}`)
+        }
       }
 
       if (!responseText || responseText.trim().length === 0) {
+        console.error('CRITICAL: responseText is empty after extraction')
         throw new Error('Empty response from Gemini API')
       }
 
