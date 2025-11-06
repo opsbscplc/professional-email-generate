@@ -49,16 +49,19 @@ body {
   * {
     @apply border-blue-400/30;
   }
-  
+
+  /* Global heading styles - but allow inline styles to override for components like SlideDisplay */
   h1, h2, h3, h4, h5, h6 {
-    color: #1877F2 !important;
+    color: #1877F2;
     @apply font-bold;
   }
-  
+
+  /* Global paragraph styles - but allow inline styles to override for components like SlideDisplay */
   p {
-    color: #42A5F5 !important;
+    color: #42A5F5;
   }
-  
+
+  /* Link styles with important to maintain consistency */
   a {
     color: #1877F2 !important;
     @apply hover:opacity-80 transition-colors;
