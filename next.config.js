@@ -25,6 +25,35 @@ const nextConfig = {
       });
     }
 
+    // Configure fallbacks for Node.js built-in modules in browser bundle
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        path: false,
+        os: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        util: false,
+        buffer: false,
+        querystring: false,
+        url: false,
+      };
+
+      // Ignore Node.js built-in modules that pptxgenjs and jspdf try to import
+      const webpack = require('webpack');
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^(node:fs|node:https|node:http|node:path|node:crypto|node:stream|node:zlib|node:util|node:buffer|node:os|node:net|node:tls)$/,
+        })
+      );
+    }
+
     if (!dev && !isServer) {
       // Split chunks for better caching
       config.optimization.splitChunks = {
