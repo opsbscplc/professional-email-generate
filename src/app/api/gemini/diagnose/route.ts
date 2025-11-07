@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         // Check 4: Can we initialize the model?
         try {
           const genAI = new GoogleGenerativeAI(apiKey)
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
           diagnostics.checks.modelInitialization = true
           console.log('✅ Google AI model initialized successfully')
           diagnostics.status = 'healthy'

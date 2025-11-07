@@ -1,64 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// OpenAI API configurations with key rotation
-const OPENAI_API_KEYS = [
-  'sk-abcdef1234567890abcdef1234567890abcdef12',
-  'sk-1234567890abcdef1234567890abcdef12345678',
-  'sk-abcdefabcdefabcdefabcdefabcdefabcdef12',
-  'sk-7890abcdef7890abcdef7890abcdef7890abcd',
-  'sk-1234abcd1234abcd1234abcd1234abcd1234abcd',
-  'sk-abcd1234abcd1234abcd1234abcd1234abcd1234',
-  'sk-5678efgh5678efgh5678efgh5678efgh5678efgh',
-  'sk-efgh5678efgh5678efgh5678efgh5678efgh5678',
-  'sk-ijkl1234ijkl1234ijkl1234ijkl1234ijkl1234',
-  'sk-mnop5678mnop5678mnop5678mnop5678mnop5678',
-  'sk-qrst1234qrst1234qrst1234qrst1234qrst1234',
-  'sk-uvwx5678uvwx5678uvwx5678uvwx5678uvwx5678',
-  'sk-1234ijkl1234ijkl1234ijkl1234ijkl1234ijkl',
-  'sk-5678mnop5678mnop5678mnop5678mnop5678mnop',
-  'sk-qrst5678qrst5678qrst5678qrst5678qrst5678',
-  'sk-uvwx1234uvwx1234uvwx1234uvwx1234uvwx1234',
-  'sk-1234abcd5678efgh1234abcd5678efgh1234abcd',
-  'sk-5678ijkl1234mnop5678ijkl1234mnop5678ijkl',
-  'sk-abcdqrstefghuvwxabcdqrstefghuvwxabcdqrst',
-  'sk-ijklmnop1234qrstijklmnop1234qrstijklmnop',
-  'sk-1234uvwx5678abcd1234uvwx5678abcd1234uvwx',
-  'sk-efghijkl5678mnopabcd1234efghijkl5678mnop',
-  'sk-mnopqrstuvwxabcdmnopqrstuvwxabcdmnopqrst',
-  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop',
-  'sk-abcd1234efgh5678abcd1234efgh5678abcd1234',
-  'sk-1234ijklmnop5678ijklmnop1234ijklmnop5678',
-  'sk-qrstefghuvwxabcdqrstefghuvwxabcdqrstefgh',
-  'sk-uvwxijklmnop1234uvwxijklmnop1234uvwxijkl',
-  'sk-abcd5678efgh1234abcd5678efgh1234abcd5678',
-  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop',
-  'sk-1234qrstuvwxabcd1234qrstuvwxabcd1234qrst',
-  'sk-efghijklmnop5678efghijklmnop5678efghijkl',
-  'sk-mnopabcd1234efghmnopabcd1234efghmnopabcd',
-  'sk-ijklqrst5678uvwxijklqrst5678uvwxijklqrst',
-  'sk-1234ijkl5678mnop1234ijkl5678mnop1234ijkl',
-  'sk-abcdqrstefgh5678abcdqrstefgh5678abcdqrst',
-  'sk-ijklmnopuvwx1234ijklmnopuvwx1234ijklmnop',
-  'sk-efgh5678abcd1234efgh5678abcd1234efgh5678',
-  'sk-mnopqrstijkl5678mnopqrstijkl5678mnopqrst',
-  'sk-1234uvwxabcd5678uvwxabcd1234uvwxabcd5678',
-  'sk-ijklmnop5678efghijklmnop5678efghijklmnop',
-  'sk-abcd1234qrstuvwxabcd1234qrstuvwxabcd1234',
-  'sk-1234efgh5678ijkl1234efgh5678ijkl1234efgh',
-  'sk-5678mnopqrstuvwx5678mnopqrstuvwx5678mnop',
-  'sk-abcdijkl1234uvwxabcdijkl1234uvwxabcdijkl',
-  'sk-ijklmnopabcd5678ijklmnopabcd5678ijklmnop',
-  'sk-1234efghqrstuvwx1234efghqrstuvwx1234efgh',
-  'sk-5678ijklmnopabcd5678ijklmnopabcd5678ijkl',
-  'sk-abcd1234efgh5678abcd1234efgh5678abcd1234',
-  'sk-ijklmnopqrstuvwxijklmnopqrstuvwxijklmnop'
-]
+// Exponential backoff utility for retries
+async function exponentialBackoff(attempt: number, maxDelay: number = 10000): Promise<void> {
+  const delay = Math.min(Math.pow(2, attempt) * 1000, maxDelay)
+  console.log(`⏳ Waiting ${delay}ms before retry attempt ${attempt + 1}...`)
+  await new Promise(resolve => setTimeout(resolve, delay))
+}
 
+// OpenAI API configuration (optional - configure via environment variable)
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const OPENAI_BASE_URL = 'https://api.openai.com/v1'
-
-// Session-based key rotation
-let currentKeyIndex = Math.floor(Math.random() * OPENAI_API_KEYS.length)
 
 // Claude API configuration (you'll need to get your own API key from https://console.anthropic.com/)
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '' // Add your Claude API key to environment variables
@@ -123,98 +75,60 @@ async function callClaude(prompt: string, timeout: number = 60000): Promise<stri
   return content
 }
 
-// OpenAI API helper function with key rotation
+// OpenAI API helper function with retry logic
 async function callOpenAI(prompt: string, timeout: number = 60000): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured')
+  }
+
   console.log('🤖 Attempting OpenAI API call...')
-  
+
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('OpenAI request timeout')), timeout)
   })
 
-  // Try up to 3 different API keys in case one is rate limited
-  const maxKeyAttempts = 3
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < maxKeyAttempts; attempt++) {
-    try {
-      // Get current API key and rotate for next use
-      const apiKey = OPENAI_API_KEYS[currentKeyIndex]
-      currentKeyIndex = (currentKeyIndex + 1) % OPENAI_API_KEYS.length
-      
-      console.log(`🔑 Using OpenAI key #${currentKeyIndex + 1} (attempt ${attempt + 1})`)
-      
-      const requestBody = {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000
+  const requestBody = {
+    model: 'gpt-3.5-turbo',
+    messages: [
+      {
+        role: 'user',
+        content: prompt
       }
-
-      const apiPromise = fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      const response = await Promise.race([apiPromise, timeoutPromise]) as Response
-      
-      console.log(`📥 OpenAI Response:`, response.status, response.statusText)
-      
-      if (response.ok) {
-        const data = await response.json()
-        
-        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-          const content = data.choices[0].message.content
-          console.log(`✅ OpenAI successful! Length:`, content?.length || 0)
-          return content
-        } else {
-          console.log(`❌ OpenAI invalid response structure:`, data)
-          throw new Error('Invalid response structure from OpenAI')
-        }
-      } else {
-        const errorText = await response.text()
-        console.log(`❌ OpenAI failed:`, response.status, errorText)
-        
-        // If rate limited, try next key
-        if (response.status === 429) {
-          console.log('⏳ Rate limited, trying next API key...')
-          lastError = new Error(`Rate limited: ${errorText}`)
-          continue
-        }
-        
-        // If unauthorized, try next key
-        if (response.status === 401) {
-          console.log('🔑 Unauthorized, trying next API key...')
-          lastError = new Error(`Unauthorized: ${errorText}`)
-          continue
-        }
-        
-        // For other errors, throw immediately
-        throw new Error(`OpenAI API error: ${response.status} ${errorText}`)
-      }
-    } catch (error) {
-      console.log(`❌ OpenAI attempt ${attempt + 1} error:`, error)
-      lastError = error instanceof Error ? error : new Error('Unknown OpenAI error')
-      
-      // If it's a timeout or network error, try next key
-      if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('fetch'))) {
-        continue
-      }
-      
-      // For other errors, try next key
-      continue
-    }
+    ],
+    temperature: 0.7,
+    max_tokens: 4000
   }
-  
-  throw lastError || new Error('All OpenAI API keys failed')
+
+  const apiPromise = fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  })
+
+  const response = await Promise.race([apiPromise, timeoutPromise]) as Response
+
+  console.log('📥 OpenAI Response status:', response.status, response.statusText)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('❌ OpenAI API error details:', errorText)
+    throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+    console.error('❌ Invalid OpenAI response structure:', data)
+    throw new Error('Invalid response from OpenAI API')
+  }
+
+  const content = data.choices[0].message.content
+  console.log('✅ OpenAI successful response length:', content?.length || 0)
+
+  return content
 }
 
 // Emergency fallback - generates basic slides when all AI services fail
@@ -451,23 +365,49 @@ export async function POST(request: NextRequest) {
     let slideText
     let usingFallback = false
 
-    // Try Gemini first
-    try {
-      console.log('Attempting slide generation with Gemini...')
-      const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
-      
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Gemini request timeout')), 30000)
-      })
+    // Try Gemini first with retry logic
+    const maxGeminiRetries = 3
+    let geminiError: any = null
 
-      const slidePromise = model.generateContent(slidePrompt)
-      const slideResult = await Promise.race([slidePromise, timeoutPromise]) as any
-      const slideResponse = await slideResult.response
-      slideText = await slideResponse.text()
-      console.log('Gemini slide generation successful')
-    } catch (geminiError) {
-      console.log('Gemini failed, trying fallback services...', geminiError)
+    for (let attempt = 0; attempt < maxGeminiRetries; attempt++) {
+      try {
+        console.log(`Attempting slide generation with Gemini (attempt ${attempt + 1}/${maxGeminiRetries})...`)
+        const genAI = new GoogleGenerativeAI(apiKey)
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Gemini request timeout')), 45000)
+        })
+
+        const slidePromise = model.generateContent(slidePrompt)
+        const slideResult = await Promise.race([slidePromise, timeoutPromise]) as any
+        const slideResponse = await slideResult.response
+        slideText = await slideResponse.text()
+        console.log('✅ Gemini slide generation successful')
+        geminiError = null
+        break // Success, exit retry loop
+      } catch (error) {
+        geminiError = error
+        console.log(`❌ Gemini attempt ${attempt + 1} failed:`, error)
+
+        // Check if it's a rate limit error
+        const errorMessage = error instanceof Error ? error.message.toLowerCase() : ''
+        const isRateLimit = errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')
+
+        if (isRateLimit && attempt < maxGeminiRetries - 1) {
+          await exponentialBackoff(attempt)
+          continue
+        } else if (attempt < maxGeminiRetries - 1) {
+          // For other errors, wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
+          continue
+        }
+      }
+    }
+
+    // If Gemini failed after all retries, try fallback services
+    if (geminiError) {
+      console.log('Gemini failed after all retries, trying fallback services...', geminiError)
       usingFallback = true
       
       // Try Claude first (if API key is configured)
@@ -541,57 +481,76 @@ Return only the speaker notes text, nothing else.`
 
         let speakerNotes = ''
 
-        // Use Gemini for speaker notes with retry logic
-        let retryCount = 0
-        const maxRetries = 2
-        
-        while (retryCount <= maxRetries) {
+        // Use Gemini for speaker notes with retry logic and exponential backoff
+        const maxRetries = 3
+        let speakerNotesError: any = null
+
+        for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
           try {
             const genAI = new GoogleGenerativeAI(apiKey)
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
-            
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
             const notesTimeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 10000)
+              setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 15000)
             })
-            
+
             const notesPromise = model.generateContent(notesPrompt)
             const notesResult = await Promise.race([notesPromise, notesTimeoutPromise]) as any
             const notesResponse = await notesResult.response
             speakerNotes = (await notesResponse.text()).trim()
+            speakerNotesError = null
             break // Success, exit retry loop
-          } catch (geminiError) {
-            retryCount++
-            console.log(`Gemini speaker notes attempt ${retryCount} failed for slide ${index + 1}:`, geminiError)
-            
-            if (retryCount > maxRetries) {
-              // Try fallback services for speaker notes
-              if (CLAUDE_API_KEY) {
-                try {
-                  console.log(`Trying Claude for speaker notes on slide ${index + 1}...`)
-                  speakerNotes = await callClaude(notesPrompt, 15000)
-                } catch (claudeError) {
-                  console.log(`Claude failed for speaker notes on slide ${index + 1}, trying OpenAI...`)
-                  try {
-                    speakerNotes = await callOpenAI(notesPrompt, 15000)
-                  } catch (openaiError) {
-                    console.log(`OpenAI also failed for speaker notes on slide ${index + 1}:`, openaiError)
-                    speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
-                  }
-                }
+          } catch (error) {
+            speakerNotesError = error
+            console.log(`❌ Gemini speaker notes attempt ${retryCount + 1} failed for slide ${index + 1}:`, error)
+
+            // Check if it's a rate limit error
+            const errorMessage = error instanceof Error ? error.message.toLowerCase() : ''
+            const isRateLimit = errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('too many requests')
+
+            if (retryCount < maxRetries - 1) {
+              if (isRateLimit) {
+                await exponentialBackoff(retryCount, 5000) // Shorter max delay for speaker notes
               } else {
-                // Try OpenAI for speaker notes
-                try {
-                  console.log(`Trying OpenAI for speaker notes on slide ${index + 1}...`)
-                  speakerNotes = await callOpenAI(notesPrompt, 15000)
-                } catch (openaiError) {
-                  console.log(`OpenAI also failed for speaker notes on slide ${index + 1}:`, openaiError)
-                  speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
-                }
+                await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)))
               }
-            } else {
-              // Wait before retry
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+              continue
             }
+          }
+        }
+
+        // If Gemini failed for speaker notes after retries, try fallback services
+        if (speakerNotesError) {
+          // Try fallback services for speaker notes
+          if (CLAUDE_API_KEY) {
+            try {
+              console.log(`Trying Claude for speaker notes on slide ${index + 1}...`)
+              speakerNotes = await callClaude(notesPrompt, 15000)
+            } catch (claudeError) {
+              console.log(`Claude failed for speaker notes on slide ${index + 1}, trying OpenAI...`)
+              try {
+                if (OPENAI_API_KEY) {
+                  speakerNotes = await callOpenAI(notesPrompt, 15000)
+                } else {
+                  throw new Error('OpenAI API key not configured')
+                }
+              } catch (openaiError) {
+                console.log(`All AI services failed for speaker notes on slide ${index + 1}:`, openaiError)
+                speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+              }
+            }
+          } else if (OPENAI_API_KEY) {
+            // Try OpenAI for speaker notes if Claude is not configured
+            try {
+              console.log(`Trying OpenAI for speaker notes on slide ${index + 1}...`)
+              speakerNotes = await callOpenAI(notesPrompt, 15000)
+            } catch (openaiError) {
+              console.log(`OpenAI also failed for speaker notes on slide ${index + 1}:`, openaiError)
+              speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
+            }
+          } else {
+            // No fallback services configured, use generic speaker notes
+            speakerNotes = `Here are some key points to discuss for this slide about ${slide.title.toLowerCase()}. Focus on explaining each bullet point clearly and connecting them to the overall topic of ${topic}. Take your time to elaborate on each point and provide examples where relevant.`
           }
         }
 
@@ -620,51 +579,99 @@ Return only the speaker notes text, nothing else.`
 
   } catch (error) {
     console.error('Slide generation error:', error)
-    
-    // Handle specific Gemini API errors
+
+    // Handle specific API errors with user-friendly messages
     if (error instanceof Error) {
       const errorMessage = error.message.toLowerCase()
-      
-      if (errorMessage.includes('api_key_invalid') || errorMessage.includes('invalid api key')) {
+
+      // Invalid API key
+      if (errorMessage.includes('api_key_invalid') || errorMessage.includes('invalid api key') || errorMessage.includes('invalid_api_key')) {
         return NextResponse.json(
-          { success: false, error: 'Invalid API key. Please check your Google Gemini API key.' },
+          {
+            success: false,
+            error: 'Invalid API key. Please verify your Google Gemini API key is correct and active.'
+          },
           { status: 401 }
         )
       }
-      
-      if (errorMessage.includes('permission_denied') || errorMessage.includes('permission denied')) {
+
+      // Permission denied
+      if (errorMessage.includes('permission_denied') || errorMessage.includes('permission denied') || errorMessage.includes('403')) {
         return NextResponse.json(
-          { success: false, error: 'Permission denied. Please ensure your API key has the necessary permissions.' },
+          {
+            success: false,
+            error: 'Access denied. Please ensure your API key has permission to use Gemini models.'
+          },
           { status: 403 }
         )
       }
-      
-      if (errorMessage.includes('quota_exceeded') || errorMessage.includes('quota exceeded')) {
+
+      // Rate limiting or quota exceeded
+      if (errorMessage.includes('quota_exceeded') || errorMessage.includes('quota exceeded') ||
+          errorMessage.includes('429') || errorMessage.includes('rate limit') ||
+          errorMessage.includes('too many requests')) {
         return NextResponse.json(
-          { success: false, error: 'API quota exceeded. Please check your usage limits.' },
+          {
+            success: false,
+            error: 'Rate limit reached. Please wait a moment and try again, or check your API usage quota.'
+          },
           { status: 429 }
         )
       }
 
-      if (errorMessage.includes('service unavailable') || errorMessage.includes('503') || errorMessage.includes('all gemini models are currently unavailable')) {
+      // Model not found
+      if (errorMessage.includes('404') || errorMessage.includes('not found') ||
+          errorMessage.includes('model') || errorMessage.includes('not available')) {
         return NextResponse.json(
-          { success: false, error: 'All Gemini AI models are temporarily unavailable. This usually resolves within a few minutes. Please try again shortly.' },
+          {
+            success: false,
+            error: 'The AI model is currently unavailable. This is usually temporary - please try again in a few moments.'
+          },
           { status: 503 }
         )
       }
 
-      if (errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+      // Service unavailable
+      if (errorMessage.includes('service unavailable') || errorMessage.includes('503') ||
+          errorMessage.includes('unavailable') || errorMessage.includes('maintenance')) {
         return NextResponse.json(
-          { success: false, error: 'Request timeout. The AI service is taking longer than expected. Please try again.' },
+          {
+            success: false,
+            error: 'The AI service is temporarily unavailable. Please try again in a few minutes.'
+          },
+          { status: 503 }
+        )
+      }
+
+      // Timeout errors
+      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Request timed out. The service is responding slowly. Please try again.'
+          },
           { status: 408 }
         )
       }
+
+      // Network errors
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('connection')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Network error. Please check your internet connection and try again.'
+          },
+          { status: 500 }
+        )
+      }
     }
-    
+
+    // Generic error fallback - don't expose internal error details to users
+    console.error('Unhandled error in slide generation:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to generate slides. Please try again.' 
+      {
+        success: false,
+        error: 'An unexpected error occurred while generating slides. Please try again.'
       },
       { status: 500 }
     )

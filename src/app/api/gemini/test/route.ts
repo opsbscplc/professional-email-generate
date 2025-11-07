@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     // Test the API key with a simple request
     try {
       const genAI = new GoogleGenerativeAI(apiKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
       // Send a minimal test prompt with timeout
       const timeoutPromise = new Promise((_, reject) => {
