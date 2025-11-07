@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
 
     try {
       genAI = new GoogleGenerativeAI(apiKey)
-      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
     } catch (initError) {
       console.error('Failed to initialize Google Generative AI:', initError)
       const response = NextResponse.json(
