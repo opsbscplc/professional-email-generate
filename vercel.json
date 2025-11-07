@@ -3,14 +3,21 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
+  "installCommand": "npm ci --prefer-offline=false --no-audit --loglevel=error",
   "devCommand": "npm run dev",
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "NPM_CONFIG_FETCH_RETRIES": "5",
+    "NPM_CONFIG_FETCH_RETRY_MINTIMEOUT": "20000",
+    "NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT": "120000"
   },
   "build": {
     "env": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "NPM_CONFIG_FETCH_RETRIES": "5",
+      "NPM_CONFIG_FETCH_RETRY_MINTIMEOUT": "20000",
+      "NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT": "120000",
+      "NPM_CONFIG_MAXSOCKETS": "5"
     }
   },
   "functions": {

@@ -61,6 +61,8 @@ next-env.d.ts
 # OS
 Thumbs.db
 
-# Ignore all .md files except README.md
+# Ignore all .md files except README.md and deployment docs
 *.md
-!README.mdnul
+!README.md
+!VERCEL_DEPLOYMENT_FIX.md
+!DEPLOYMENT_CHECKLIST.md
