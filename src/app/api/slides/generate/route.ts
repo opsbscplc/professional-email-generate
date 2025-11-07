@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`Attempting slide generation with Gemini (attempt ${attempt + 1}/${maxGeminiRetries})...`)
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Gemini request timeout')), 45000)
@@ -488,7 +488,7 @@ Return only the speaker notes text, nothing else.`
         for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
           try {
             const genAI = new GoogleGenerativeAI(apiKey)
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
             const notesTimeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error('Gemini speaker notes timeout')), 15000)
