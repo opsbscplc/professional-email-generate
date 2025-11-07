@@ -7,8 +7,6 @@ import { SlideDisplay } from '@/components/SlideDisplay'
 import { SpeakerNotes } from '@/components/SpeakerNotes'
 import { SlideNavigation } from '@/components/SlideNavigation'
 import { cn } from '@/lib/utils'
-import pptxgen from 'pptxgenjs'
-import { jsPDF } from 'jspdf'
 
 interface SlideViewerProps {
   presentation: SlidePresentation
@@ -79,7 +77,8 @@ export function SlideViewer({
     setIsExportDropdownOpen(false)
   }
 
-  const exportToPowerPoint = () => {
+  const exportToPowerPoint = async () => {
+    const pptxgen = (await import('pptxgenjs')).default
     const ppt = new pptxgen()
 
     // Theme color mappings
@@ -196,8 +195,9 @@ export function SlideViewer({
     setIsExportDropdownOpen(false)
   }
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     // Create PDF in landscape mode (presentation format)
+    const { jsPDF } = await import('jspdf')
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',

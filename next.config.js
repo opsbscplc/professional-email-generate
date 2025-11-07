@@ -16,6 +16,15 @@ const nextConfig = {
   },
   // Code splitting and bundle optimization
   webpack: (config, { dev, isServer }) => {
+    // Exclude client-only libraries from server bundle
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'pptxgenjs': 'commonjs pptxgenjs',
+        'jspdf': 'commonjs jspdf'
+      });
+    }
+
     if (!dev && !isServer) {
       // Split chunks for better caching
       config.optimization.splitChunks = {
